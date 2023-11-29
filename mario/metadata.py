@@ -43,21 +43,14 @@ class Item:
         return json_representation
 
 
-class Metadata:
+class Metadata(Item):
 
     def __init__(self, name: str = None):
+        super().__init__()
         self._items: List[Item] = []
         self.name = name
         if self.name is None:
             self.name = 'Metadata'
-
-    @property
-    def name(self):
-        return self._name
-
-    @name.setter
-    def name(self, value):
-        self._name = value
 
     def get_metadata(self, name: str):
         for item in self._items:
