@@ -86,12 +86,21 @@ def metadata_from_json(file_path: str = None):
     with open(file_path) as metadata_file:
         metadata_json = json.load(metadata_file)
 
-    for item in metadata_json['collection']['items']:
+    if 'collection' in metadata_json:
+        collection = 'collection'
+        items = 'items'
+        name = 'name'
+    else:
+        collection = 'datasource'
+        items = 'fields'
+        name = 'fieldName'
+
+    for item in metadata_json[collection][items]:
         metadata_item = Item()
-        metadata_item.name = item['name']
+        metadata_item.name = item[name]
         metadata_item.description = item['description']
         for prop in item:
-            if prop not in ['name', 'description']:
+            if prop not in [name, 'description']:
                 metadata_item.set_property(prop, item[prop])
         metadata.add_item(metadata_item)
 

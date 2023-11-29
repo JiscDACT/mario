@@ -17,3 +17,8 @@ def test_save_metadata():
     metadata = metadata_from_json(file_path=metadata_file)
     with tempfile.NamedTemporaryFile() as file:
         metadata.save(file_path=file.name)
+
+
+def test_load_tdsa():
+    metadata_file = os.path.join('test', 'tdsa.json')
+    metadata = metadata_from_json(file_path=metadata_file)
