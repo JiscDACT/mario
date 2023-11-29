@@ -13,6 +13,7 @@ class DatasetSpecification:
         self._collection: str = ''
         self._measures: List[str] = []
         self._dimensions: List[str] = []
+        self._properties = []
 
     @property
     def name(self):
@@ -53,6 +54,14 @@ class DatasetSpecification:
     @property
     def items(self):
         return self.dimensions + self.measures
+
+    def set_property(self, name, value):
+        self._properties[name] = value
+
+    def get_property(self, name):
+        if name in self._properties:
+            return self._properties[name]
+        return None
 
     def save(self, file_path: str):
         json_representation = {
