@@ -58,6 +58,10 @@ class Metadata(Item):
                 return item
         return None
 
+    @property
+    def items(self):
+        return self._items
+
     def add_item(self, item: Item) -> None:
         self._items.append(item)
 
