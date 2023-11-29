@@ -95,6 +95,8 @@ def metadata_from_json(file_path: str = None):
         items = 'fields'
         name = 'fieldName'
 
+    metadata.name = metadata_json[collection]['name']
+
     for item in metadata_json[collection][items]:
         metadata_item = Item()
         metadata_item.name = item[name]
