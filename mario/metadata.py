@@ -66,7 +66,7 @@ class Metadata(Item):
         self._items.append(item)
 
     def merge_items(self, metadata) -> None:
-        for item in metadata._items:
+        for item in metadata.items:
             self.add_item(item)
 
     def save(self, file_path: str = None) -> None:
