@@ -1,0 +1,22 @@
+{
+  "name": "Superstore",
+  "description": "This is an example of a dataset definition",
+  "collection": "superstore",
+  "measures": [
+      "Sales",
+      "Profit",
+      "Profit Ratio",
+      "Discount"
+    ],
+  "dimensions": [
+      "Ship Mode",
+      "Ship Date",
+      "Country/Region",
+      "Region",
+      "State/Province",
+      "City",
+      "Postal Code",
+      "Category",
+      "Product Name"
+    ]
+}

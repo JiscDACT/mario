@@ -1,0 +1,130 @@
+{
+  "collection": {
+    "name": "Superstore",
+    "description": "The core dataset for doing Tableau testing.",
+    "items": [
+      {
+        "name": "Order Identifier",
+        "description": "The identifier for the order",
+        "physical_column_name": "Order ID"
+      },
+      {
+        "name": "Ship Mode",
+        "description": "Mode of shipping",
+        "groups": [
+          "Shipping"
+        ],
+        "domain": [
+          "First Class", "Same Day", "Second Class", "Standard Class"
+        ]
+      },
+      {
+        "name": "Ship Date",
+        "description": "Date of shipping",
+        "groups": [
+          "Shipping"
+        ]
+      },
+      {
+        "name": "Category",
+        "description": "Category of item",
+        "groups": [
+          "Product"
+        ],
+        "hierarchies": [
+          {
+            "hierarchy": "Product",
+            "level": 10
+          }
+        ]
+      },
+      {
+        "name": "Product Name",
+        "description": "Name of item",
+        "groups": [
+          "Product"
+        ],
+        "hierarchies": [
+          {
+            "hierarchy": "Product",
+            "level": 20
+          }
+        ]
+      },
+      {
+        "name": "Country/Region",
+        "description": "Country/Region",
+        "hierarchies": [
+          {
+            "hierarchy": "Location",
+            "level": 10
+          }
+        ]
+      },
+      {
+        "name": "Region",
+        "description": "Region",
+        "hierarchies": [
+          {
+            "hierarchy": "Location",
+            "level": 20
+          }
+        ]
+      },
+      {
+        "name": "State/Province",
+        "description": "State/Province",
+        "hierarchies": [
+          {
+            "hierarchy": "Location",
+            "level": 30
+          }
+        ]
+      },
+      {
+        "name": "City",
+        "description": "City",
+        "hierarchies": [
+          {
+            "hierarchy": "Location",
+            "level": 40
+          }
+        ]
+      },
+      {
+        "name": "Postal Code",
+        "description": "Postal Code",
+        "hierarchies": [
+          {
+            "hierarchy": "Location",
+            "level": 50
+          }
+        ]
+      },
+      {
+        "name": "Profit Ratio",
+        "description": "Profit Ratio",
+        "formula": "SUM([Profit])/SUM([Sales])",
+        "default_format": "p0.00%",
+        "datatype": "double"
+      },
+      {
+        "name": "Sales",
+        "description": "Sales",
+        "datatype": "double"
+      },
+      {
+        "name": "Profit",
+        "description": "Profit",
+        "default_format": "C2057%",
+        "datatype": "double"
+      },
+      {
+        "name": "Discount",
+        "description": "Discount",
+        "datatype": "double",
+        "range": [0.0, 1.0]
+      }
+    ]
+  }
+}
