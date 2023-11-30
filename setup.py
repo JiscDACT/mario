@@ -16,5 +16,5 @@ setup(
         '': ['*.ini']
     },
     include_package_data=True,
-    install_requires=['pandas', 'tableauhyperapi', 'pantab']
+    install_requires=['pandas', 'tableauhyperapi', 'pantab', 'tableau-builder==0.18']
 )
