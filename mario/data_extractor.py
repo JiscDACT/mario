@@ -37,24 +37,27 @@ class DataExtractor:
 
     def __init__(self,
                  configuration: Configuration,
-                 dataset_specification: DatasetSpecification,
+                 dataset_specification: DatasetSpecification ,
                  metadata: Metadata):
         self.configuration = configuration
         self.dataset_specification = dataset_specification
         self.metadata = metadata
-        self._data = pd.DataFrame()
-        if configuration.file_path is not None:
-            if configuration.file_path.endswith('.csv'):
-                self.__load_from_csv__()
-            elif configuration.file_path.endswith('.hyper'):
-                self.__load_from_hyper__()
+        self._data = None
+
+    def __load__(self):
+        if self.configuration is not None:
+            if self.configuration.file_path is not None:
+                if self.configuration.file_path.endswith('.csv'):
+                    self.__load_from_csv__()
+                elif self.configuration.file_path.endswith('.hyper'):
+                    self.__load_from_hyper__()
+                else:
+                    raise ValueError("Unsupported file type")
+            elif self.configuration.hook is not None:
+                # TODO something here for Airflow hooks
+                pass
             else:
-                raise ValueError("Unsupported file type")
-        elif configuration.hook is not None:
-            # TODO something here for Airflow hooks
-            pass
-        else:
-            self.__load_from_sql__()
+                self.__load_from_sql__()
 
     def __load_from_sql__(self):
         query = self.__build_query__()
@@ -92,6 +95,8 @@ class DataExtractor:
         self._data = self._data[columns_to_keep]
 
     def validate_data(self):
+        if self._data is None:
+            self.__load__()
         validation_errors = []
         for item in self.dataset_specification.items:
             metadata = self.metadata.get_metadata(item)
@@ -129,9 +134,13 @@ class DataExtractor:
         return True
 
     def get_data_frame(self) -> DataFrame:
+        if self._data is None:
+            self.__load__()
         return self._data
 
     def save_data_as_excel(self, file_path: str, minimise=True):
+        if self._data is None:
+            self.__load__()
         if minimise:
             self.__minimise_data__()
         # TODO use OpenPyxl here, or drop this method
@@ -139,11 +148,15 @@ class DataExtractor:
         pass
 
     def save_data_as_csv(self, file_path: str, minimise=True):
+        if self._data is None:
+            self.__load__()
         if minimise:
             self.__minimise_data__()
         self._data.to_csv(file_path)
 
     def save_data_as_hyper(self, file_path: str, table: str = 'Extract', schema: str = 'Extract', minimise=True):
+        if self._data is None:
+            self.__load__()
         table_name = TableName(schema, table)
         if minimise:
             self.__minimise_data__()
@@ -160,7 +173,8 @@ class HyperFile(DataExtractor):
                  configuration: Configuration,
                  dataset_specification: DatasetSpecification,
                  metadata: Metadata):
-        super().__init__(configuration, dataset_specification, metadata)
+        super().__init__(None, dataset_specification, metadata)
+        self.configuration = configuration
 
     def validate_data(self):
         from tableau_builder.hyper_utils import get_default_table_and_schema, check_column_exists, check_type, \
