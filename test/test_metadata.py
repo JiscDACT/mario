@@ -10,6 +10,7 @@ def test_load_metadata():
     assert metadata.get_metadata('Ship Mode') is not None
     assert metadata.get_metadata('Ship Mode').description is not None
     assert metadata.get_metadata('Ship Mode').get_property('groups') == ['Shipping']
+    assert metadata.get_property('description') is not None
 
 
 def test_save_metadata():

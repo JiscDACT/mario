@@ -1,13 +1,14 @@
 import json
 from typing import List
+from mario.base import MarioBase
 
 
-class Item:
+class Item(MarioBase):
 
     def __init__(self):
+        super().__init__()
         self._name = ''
         self._description = ''
-        self._properties = {}
 
     @property
     def name(self):
@@ -24,14 +25,6 @@ class Item:
     @description.setter
     def description(self, value):
         self._description = value
-
-    def set_property(self, name, value):
-        self._properties[name] = value
-
-    def get_property(self, name):
-        if name in self._properties:
-            return self._properties[name]
-        return None
 
     def to_json(self):
         json_representation = {
@@ -100,14 +93,13 @@ def metadata_from_json(file_path: str = None):
         name = 'fieldName'
 
     metadata.name = metadata_json[collection]['name']
+    metadata.add_properties(source=metadata_json[collection], exclude=[name, items])
 
     for item in metadata_json[collection][items]:
         metadata_item = Item()
         metadata_item.name = item[name]
         metadata_item.description = item['description']
-        for prop in item:
-            if prop not in [name, 'description']:
-                metadata_item.set_property(prop, item[prop])
+        metadata_item.add_properties(source=item, exclude=[name, 'description'])
         metadata.add_item(metadata_item)
 
     return metadata

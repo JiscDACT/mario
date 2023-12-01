@@ -1,19 +1,20 @@
 import json
 from typing import List
+from mario.base import MarioBase
 
 
-class DatasetSpecification:
+class DatasetSpecification(MarioBase):
     """
     Base class/interface for dataset specifications. Use an implementation specific to the
     format of specification used.
     """
 
     def __init__(self):
+        super().__init__()
         self._name = ''
         self._collection: str = ''
         self._measures: List[str] = []
         self._dimensions: List[str] = []
-        self._properties = {}
 
     @property
     def name(self):
@@ -55,14 +56,6 @@ class DatasetSpecification:
     def items(self):
         return self.dimensions + self.measures
 
-    def set_property(self, name, value):
-        self._properties[name] = value
-
-    def get_property(self, name):
-        if name in self._properties:
-            return self._properties[name]
-        return None
-
     def save(self, file_path: str):
         json_representation = {
             "name": self.name,
@@ -83,8 +76,6 @@ def dataset_from_json(file_path: str = None) -> DatasetSpecification:
     dataset_specification.collection = spec['collection']
     dataset_specification.measures = spec['measures']
     dataset_specification.dimensions = spec['dimensions']
-    for prop in spec:
-        if prop not in ['name', 'collection', 'measures', 'dimensions']:
-            dataset_specification.set_property(prop, spec[prop])
+    dataset_specification.add_properties(source=spec, exclude=['name', 'collection', 'measures', 'dimensions'])
 
     return dataset_specification
