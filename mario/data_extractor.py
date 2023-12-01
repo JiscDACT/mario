@@ -182,36 +182,34 @@ class HyperFile(DataExtractor):
                         schema_name=schema
                 ):
                     validation_errors.append("Item missing: " + item)
-
-                if metadata.get_property('datatype') and not check_type(
-                        hyper_path=self.configuration.file_path,
-                        column_name=item,
-                        expected_type=metadata.get_property('datatype'),
-                        table_name=table,
-                        schema_name=schema
-                ):
-                    validation_errors.append("Item is wrong type: " + item)
-
-            if metadata.get_property('domain') is not None:
-                if not check_domain(
-                        hyper_path=self.configuration.file_path,
-                        field=item,
-                        domain=metadata.get_property('domain'),
-                        table_name=table,
-                        schema_name=schema
-                ):
-                    validation_errors.append("Domain validation failed for " + item)
-            if metadata.get_property('range') is not None:
-                if not check_range(
-                        hyper_path=self.configuration.file_path,
-                        field=item,
-                        min_value=metadata.get_property('range')[0],
-                        max_value=metadata.get_property('range')[1],
-                        table_name=table,
-                        schema_name=schema
-                ):
-                    validation_errors.append("Range validation failed for " + item)
-
+                else:
+                    if metadata.get_property('datatype') and not check_type(
+                            hyper_path=self.configuration.file_path,
+                            column_name=item,
+                            expected_type=metadata.get_property('datatype'),
+                            table_name=table,
+                            schema_name=schema
+                    ):
+                        validation_errors.append("Item is wrong type: " + item)
+                    if metadata.get_property('domain') is not None:
+                        if not check_domain(
+                                hyper_path=self.configuration.file_path,
+                                field=item,
+                                domain=metadata.get_property('domain'),
+                                table_name=table,
+                                schema_name=schema
+                        ):
+                            validation_errors.append("Domain validation failed for " + item)
+                    if metadata.get_property('range') is not None:
+                        if not check_range(
+                                hyper_path=self.configuration.file_path,
+                                field=item,
+                                min_value=metadata.get_property('range')[0],
+                                max_value=metadata.get_property('range')[1],
+                                table_name=table,
+                                schema_name=schema
+                        ):
+                            validation_errors.append("Range validation failed for " + item)
         if len(validation_errors) != 0:
             for validation_error in validation_errors:
                 logger.error(validation_error)
@@ -229,7 +227,7 @@ class HyperFile(DataExtractor):
             table_name=table['table']
         )
 
-    def save_data_as_hyper(self, file_path: str, table: str = 'Extract', schema: str = 'Extract', minimise=True):
+    def save_data_as_hyper(self, file_path: str, table: str = 'Extract', schema: str = 'Extract', minimise=False):
         if minimise:
             self.__minimise_data__()
         shutil.copyfile(self.configuration.file_path, file_path)
