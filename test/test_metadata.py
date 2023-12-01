@@ -16,8 +16,11 @@ def test_load_metadata():
 def test_save_metadata():
     metadata_file = os.path.join('test', 'metadata.json')
     metadata = metadata_from_json(file_path=metadata_file)
+    metadata.set_property("fruit", "banana")
     with tempfile.NamedTemporaryFile() as file:
         metadata.save(file_path=file.name)
+        metadata = metadata_from_json(file.name)
+        assert metadata.get_property('fruit') == 'banana'
 
 
 def test_load_tdsa():

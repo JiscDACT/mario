@@ -69,6 +69,9 @@ class Metadata(Item):
                 "items": []
             }
         }
+        for prop in self.properties:
+            json_representation['collection'][prop] = self.get_property(prop)
+
         for item in self._items:
             json_representation['collection']['items'].append(item.to_json())
 

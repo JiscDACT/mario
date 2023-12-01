@@ -14,6 +14,10 @@ class MarioBase:
             return self._properties[name]
         return None
 
+    @property
+    def properties(self):
+        return self._properties
+
     def add_properties(self, source, exclude: List[str] = None):
         for prop in source:
             if exclude is not None and prop not in exclude:
