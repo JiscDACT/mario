@@ -9,3 +9,4 @@ def test_import_dataset():
 
     assert specification.collection == 'superstore'
     assert len(specification.measures) == 4
+    assert specification.get_property('description') is not None

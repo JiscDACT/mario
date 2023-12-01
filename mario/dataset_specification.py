@@ -13,7 +13,7 @@ class DatasetSpecification:
         self._collection: str = ''
         self._measures: List[str] = []
         self._dimensions: List[str] = []
-        self._properties = []
+        self._properties = {}
 
     @property
     def name(self):
@@ -83,5 +83,8 @@ def dataset_from_json(file_path: str = None) -> DatasetSpecification:
     dataset_specification.collection = spec['collection']
     dataset_specification.measures = spec['measures']
     dataset_specification.dimensions = spec['dimensions']
+    for prop in spec:
+        if prop not in ['name', 'collection', 'measures', 'dimensions']:
+            dataset_specification.set_property(prop, spec[prop])
 
     return dataset_specification
