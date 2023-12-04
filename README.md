@@ -44,7 +44,7 @@ _NOTE: As of v0.6, only some of this functionality has been
 implemented._
 
 ## Example: Tailored data
-Note that we haven't yet incorporated the SQL builder for TD,
+Note that we haven't yet incorporated the SQL extractor for TD,
 but this is what the actual control script for TD might
 look like.
 ~~~
