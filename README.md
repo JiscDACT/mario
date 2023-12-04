@@ -18,18 +18,44 @@ Use pip to install:
 
 # Using
 
+## Modules
+
+Mario has the following standard modules:
+
+* `dataset_specification`: for working with dataset 
+specifications, including loading from files.
+* `metadata`: for working with 
+metadata, including loading from JSON or Excel (SpecBuilder).
+* `data_extractor`: for extracting and supplying
+data, whether its building SQL queries, downloading a 
+single view, or a wrapper around reading a local file. It also
+has standard data QA functions.
+* `dataset_builder`: for building outputs in a range of
+formats including CSV, Excel, Tableau and PowerBI
+
+These build on one another, so the classes defined
+in the modules are used as the input parameter types
+for the constructors in others, e.g. the `DataExtractor`
+constructor takes a `DatasetSpecification` and `Metadata`, 
+while the `DatasetBuilder` constructor takes a 
+`DatasetSpecification`,`Metadata` and `DataExtractor`.
+
+_NOTE: As of v0.6, only some of this functionality has been
+implemented._
+
 ## Example: Tailored data
 Note that we haven't yet incorporated the SQL builder for TD,
-but this is what the actual control script for 'do TD' would
+but this is what the actual control script for TD might
 look like.
 ~~~
-dataset = dataset_from_json("data_spec.xlsx")
-metadata = metadata_from_json('metadata.json')
+dataset = dataset_from_excel("SpecificationInput.xlsx")
+metadata = metadata_from_excel('Metadata.xlsx')
 configuration = Configuration(connection_string=os.environ.get('odbc_connection_string'))
 extractor = DataExtractor(configuration=configuration, dataset_specification=dataset, metadata=metadata)
-builder = DatasetBuilder(dataset_specification=dataset, metadata=metadata, data=extractor)
-path = os.path.join(dataset.enquiry, dataset.name + '.xlsx')
-builder.build(file_path=path, output_format=Format.EXCEL_PIVOT)
+if extractor.validate_data():
+    builder = DatasetBuilder(dataset_specification=dataset, metadata=metadata, data=extractor)
+    path = os.path.join(dataset.enquiry, dataset.name + '.xlsx')
+    builder.build(file_path=path, output_format=Format.EXCEL_PIVOT)
 ~~~
 
 ## Example: Heidi Plus
@@ -42,9 +68,11 @@ configuration = Configuration(
     view='dbo.v_heidi_plus_student_fpe'
 )
 extractor = DataExtractor(configuration=configuration, dataset_specification=dataset, metadata=metadata)
-builder = DatasetBuilder(dataset_specification=dataset, metadata=metadata, data=extractor)
-path = os.path.join('datasources', dataset.collection, dataset.name + '.tdsx')
-builder.build(file_path=path, output_format=Format.TABLEAU_PACKAGED_DATASOURCE)
+if extractor.validate_data():
+    builder = DatasetBuilder(dataset_specification=dataset, metadata=metadata, data=extractor)
+    path = os.path.join('datasources', dataset.collection, dataset.name + '.tdsx')
+    builder.build(file_path=path, output_format=Format.TABLEAU_PACKAGED_DATASOURCE)
 ~~~
 
 # Building and releasing new versions
+TODO
