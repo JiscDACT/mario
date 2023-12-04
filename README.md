@@ -74,5 +74,16 @@ if extractor.validate_data():
     builder.build(file_path=path, output_format=Format.TABLEAU_PACKAGED_DATASOURCE)
 ~~~
 
+## Example: Multiple outputs
+The same builder can be used to build multiple outputs 
+from the same source, in different formats:
+~~~
+    builder = DatasetBuilder(dataset_specification=dataset, metadata=metadata, data=extractor)
+    builder.build(file_path=tableau_path, output_format=Format.TABLEAU_PACKAGED_DATASOURCE)
+    builder.build(file_path=excel_path, output_format=Format.EXCEL_PIVOT)
+    builder.build(file_path=csv_path, output_format=Format.CSV)
+    builder.build(file_path=pbix_path, output_format=Format.POWERBI_PACKAGE)
+~~~
+
 # Building and releasing new versions
 TODO
