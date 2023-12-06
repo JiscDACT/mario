@@ -19,6 +19,7 @@ class Configuration:
     * A view name: A view as the base for the SQL code (H+, TDSA only)
     * A hook: An object or function used to access data, e.g. S3
     * A file path: A data file to load as the source of data, e.g. data.csv
+    * A QueryBuilder class: instantiate and use to build a SQL query
     """
 
     def __init__(self,
