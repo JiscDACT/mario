@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='mario-pipeline-tools',
-    version='0.6',
+    version='0.7',
     packages=['mario'],
     url='https://github.com/JiscDACT/mario',
     license='all rights reserved',
@@ -16,5 +16,5 @@ setup(
         '': ['*.ini']
     },
     include_package_data=True,
-    install_requires=['pandas', 'tableauhyperapi', 'pantab', 'tableau-builder==0.18']
+    install_requires=['pandas', 'tableauhyperapi', 'pantab', 'tableau-builder==0.18', 'pypika']
 )
