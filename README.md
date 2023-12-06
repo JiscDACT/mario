@@ -32,6 +32,8 @@ single view, or a wrapper around reading a local file. It also
 has standard data QA functions.
 * `dataset_builder`: for building outputs in a range of
 formats including CSV, Excel, Tableau and PowerBI
+* `query_builder`: for building SQL queries - passed as 
+part of the configuration for a data_extractor.
 
 These build on one another, so the classes defined
 in the modules are used as the input parameter types
@@ -40,17 +42,19 @@ constructor takes a `DatasetSpecification` and `Metadata`,
 while the `DatasetBuilder` constructor takes a 
 `DatasetSpecification`,`Metadata` and `DataExtractor`.
 
-_NOTE: As of v0.6, only some of this functionality has been
-implemented._
+_NOTE: As of the current release, only some
+functionality has been implemented._
 
 ## Example: Tailored data
-Note that we haven't yet incorporated the SQL extractor for TD,
-but this is what the actual control script for TD might
-look like.
+_Note that the DataWarehouseQueryBuilder isn't part of the Mario 
+project, but extends the QueryBuilder base class it defines._
 ~~~
 dataset = dataset_from_excel("SpecificationInput.xlsx")
 metadata = metadata_from_excel('Metadata.xlsx')
-configuration = Configuration(connection_string=os.environ.get('odbc_connection_string'))
+configuration = Configuration(
+    connection_string=os.environ.get('odbc_connection_string'),
+    query_builder=DataWarehouseQueryBuilder
+    )
 extractor = DataExtractor(configuration=configuration, dataset_specification=dataset, metadata=metadata)
 if extractor.validate_data():
     builder = DatasetBuilder(dataset_specification=dataset, metadata=metadata, data=extractor)
@@ -65,7 +69,9 @@ dataset = dataset_from_json("dataset.json")
 metadata = metadata_from_json('metadata.json')
 configuration = Configuration(
     connection_string=os.environ.get('odbc_connection_string'),
-    view='dbo.v_heidi_plus_student_fpe'
+    view='v_heidi_plus_student_fpe',
+    schema='dbo',
+    query_builder=ViewQueryBuilder
 )
 extractor = DataExtractor(configuration=configuration, dataset_specification=dataset, metadata=metadata)
 if extractor.validate_data():
@@ -73,6 +79,24 @@ if extractor.validate_data():
     path = os.path.join('datasources', dataset.collection, dataset.name + '.tdsx')
     builder.build(file_path=path, output_format=Format.TABLEAU_PACKAGED_DATASOURCE)
 ~~~
+
+## Example: TDSA
+~~~
+dataset = dataset_from_manifest("manifest.json")
+metadata = metadata_from_manifest('manifest.json')
+configuration = Configuration(
+    connection_string=os.environ.get('odbc_connection_string'),
+    view='v_student_fpe',
+    schema='dbo',
+    query_builder=SubsetQueryBuilder
+)
+extractor = DataExtractor(configuration=configuration, dataset_specification=dataset, metadata=metadata)
+if extractor.validate_data():
+    builder = DatasetBuilder(dataset_specification=dataset, metadata=metadata, data=extractor)
+    path = os.path.join('datasources', dataset.collection, dataset.name + '.tdsx')
+    builder.build(file_path=path, output_format=Format.TABLEAU_PACKAGED_DATASOURCE)
+~~~
+
 
 ## Example: Multiple outputs
 The same builder can be used to build multiple outputs 
@@ -84,6 +108,16 @@ from the same source, in different formats:
     builder.build(file_path=csv_path, output_format=Format.CSV)
     builder.build(file_path=pbix_path, output_format=Format.POWERBI_PACKAGE)
 ~~~
+
+
+## Roadmap
+
+* Execute queries using PyODBC and SQLAlchemy
+* Create DataSpecification from "SpecificationInputTemplate.xlsx" 
+* Excel Pivot output format
+* Excel Info Sheet output
+* PowerBI PBIX output format
+
 
 # Building and releasing new versions
 TODO
