@@ -87,22 +87,56 @@ def metadata_from_json(file_path: str = None):
         metadata_json = json.load(metadata_file)
 
     if 'collection' in metadata_json:
-        collection = 'collection'
+        collection = metadata_json['collection']
+        metadata.name = collection['name']
         items = 'items'
         name = 'name'
     else:
-        collection = 'datasource'
+        collection = metadata_json['datasource']
+        metadata.name = collection['name']
         items = 'fields'
         name = 'fieldName'
 
-    metadata.name = metadata_json[collection]['name']
-    metadata.add_properties(source=metadata_json[collection], exclude=[name, items])
+    metadata.add_properties(source=collection, exclude=[name, items])
 
-    for item in metadata_json[collection][items]:
+    for item in collection[items]:
         metadata_item = Item()
         metadata_item.name = item[name]
-        metadata_item.description = item['description']
+        if 'description' in item:
+            metadata_item.description = item['description']
         metadata_item.add_properties(source=item, exclude=[name, 'description'])
         metadata.add_item(metadata_item)
 
     return metadata
+
+
+def metadata_from_manifest(file_path=None):
+    """ Factory method for creating a Metadata instance from a JSON file in manifest format"""
+    metadata = Metadata()
+
+    with open(file_path) as metadata_file:
+        metadata_json = json.load(metadata_file)
+
+    collection = metadata_json
+    metadata.name = metadata_json['datasource']
+    items = 'items'
+    name = 'fieldName'
+
+    metadata.add_properties(source=collection, exclude=[name, items])
+
+    for item in collection[items]:
+        metadata_item = Item()
+        metadata_item.name = item[name]
+        if 'description' in item:
+            metadata_item.description = item['description']
+        metadata_item.add_properties(source=item, exclude=[name, 'description'])
+        metadata.add_item(metadata_item)
+
+    # For TDSA manifests, need to also add the measure as an item
+    if 'measure' in metadata_json:
+        measure_metadata_item = Item()
+        measure_metadata_item.name = metadata_json['measure']
+        metadata.add_item(measure_metadata_item)
+
+    return metadata
+

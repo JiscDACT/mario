@@ -1,0 +1,35 @@
+{
+    "client": "test@jisc.ac.uk",
+    "customerRef": "test",
+    "datasource": "Student full-person equivalent (FPE)", 
+    "items": [
+        {
+            "fieldName": "Sex",
+            "allowedValues": ["Female"]
+        },
+        {
+            "description": "The academic year of data being provided.", 
+            "fieldName": "Academic year"
+        }, 
+        {
+            "description": "Continuation status using UNISTATS methodology. The continuation or change in status of the student from one year to the next. Not available for latest year of data", 
+            "domain": [
+                "Not known", 
+                "Continuing at provider", 
+                "Gained intended award or higher", 
+                "Dormant or writing-up", 
+                "Left with no award", 
+                "Gained other award"
+            ], 
+            "fieldName": "Continuation status"
+        }
+    ], 
+    "jobSubmitted": "2023-10-09 17:25:32.486624",
+    "measure": "FPE", 
+    "onwardUseCategory": "1", 
+    "orderRef": "manifest_test",
+    "years": [
+        "2019/20", 
+        "2020/21"
+    ]
+}

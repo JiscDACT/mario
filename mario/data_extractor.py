@@ -25,24 +25,29 @@ class Configuration:
                  connection_string: str = None,
                  hook=None,
                  view: str = None,
-                 file_path: str = None
+                 schema: str = None,
+                 file_path: str = None,
+                 query_builder=None
                  ):
         self.connection_string = connection_string
         self.hook = hook
         self.view = view
+        self.schema = schema
         self.file_path = file_path
+        self.query_builder = query_builder
 
 
 class DataExtractor:
 
     def __init__(self,
                  configuration: Configuration,
-                 dataset_specification: DatasetSpecification ,
+                 dataset_specification: DatasetSpecification,
                  metadata: Metadata):
         self.configuration = configuration
         self.dataset_specification = dataset_specification
         self.metadata = metadata
         self._data = None
+        self._query = None
 
     def __load__(self):
         if self.configuration is not None:
@@ -60,19 +65,23 @@ class DataExtractor:
                 self.__load_from_sql__()
 
     def __load_from_sql__(self):
-        query = self.__build_query__()
+        self.__build_query__()
         # TODO connect using ODBC connection string
         # TODO run query using pyodbc
-        logger.info("Executing query: " + query)
+        logger.info("Executing query")
 
     def __build_query__(self):
-        query = ''
-        if self.configuration.view is not None:
-            query = 'SELECT * FROM ' + self.configuration.view + ' WITH(NOLOCK)'
+        logger.info("Building query")
+        self._query = ''
+        if self.configuration.query_builder is not None:
+            from mario.query_builder import QueryBuilder
+            query_builder: QueryBuilder = self.configuration.query_builder(
+                configuration=self.configuration,
+                metadata=self.metadata,
+                dataset_specification=self.dataset_specification)
+            self._query = query_builder.create_query()
         else:
-            # TODO: Automation 2.0 or TDSA query builder
-            pass
-        return query
+            raise NotImplementedError
 
     def __load_from_csv__(self):
         self._data = pd.read_csv(self.configuration.file_path)
@@ -138,6 +147,17 @@ class DataExtractor:
             self.__load__()
         return self._data
 
+    def save_query(self, file_path: str):
+        """
+        Output the query used
+        :param file_path:
+        :return:
+        """
+        if self._query is None:
+            self.__build_query__()
+        with open(file_path, mode='w') as file:
+            file.write(self._query[0])
+
     def save_data_as_excel(self, file_path: str, minimise=True):
         if self._data is None:
             self.__load__()
@@ -168,12 +188,11 @@ class HyperFile(DataExtractor):
     Wrapper for a HyperFile as a data extractor - use when no data needs to be extracted,
     and we just want to treat a hyper as a hyper with no conversion to/from dataframe
     """
-
     def __init__(self,
                  configuration: Configuration,
                  dataset_specification: DatasetSpecification,
                  metadata: Metadata):
-        super().__init__(None, dataset_specification, metadata)
+        super().__init__(Configuration(), dataset_specification, metadata)
         self.configuration = configuration
 
     def validate_data(self):
