@@ -67,8 +67,9 @@ class DataExtractor:
 
     def __load_from_sql__(self):
         self.__build_query__()
-        # TODO connect using ODBC connection string
-        # TODO run query using pyodbc
+        from sqlalchemy import create_engine
+        engine = create_engine(self.configuration.connection_string)
+        self._data = pd.read_sql(sql=self._query[0], con=engine.connect(), params=self._query[1])
         logger.info("Executing query")
 
     def __build_query__(self):
