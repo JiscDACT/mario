@@ -42,7 +42,7 @@ class ViewBasedQueryBuilder(QueryBuilder):
         )
 
     def create_query(self) -> [str, List[any]]:
-        _sql = 'SELECT * FROM [' + self.configuration.schema + '].[' + self.configuration.view + "] WITH(NOLOCK)"
+        _sql = 'SELECT * FROM "' + self.configuration.schema + '"."' + self.configuration.view + '"'
         _params = []
         return [_sql, _params]
 
@@ -80,18 +80,26 @@ class SubsetQueryBuilder(QueryBuilder):
         :return: an array containing the query prepared statement, and the parameters
         """
 
-        select_fields = self.dataset_specification.items.copy()
+        select_fields = []
+        for field in self.dataset_specification.items:
+            # Don't include calculated fields
+            meta = self.metadata.get_metadata(field)
+            if not meta.get_property('formula'):
+                select_fields.append(field)
         group_fields = select_fields.copy()
 
         # remove measures from regular select
+        measures = []
         for measure in self.dataset_specification.measures:
-            group_fields.remove(measure)
-            select_fields.remove(measure)
-            # Decide column name based on whether 'subject' fields are present
-            if measure in ['FPE', 'FTE'] and not self.contains_subject():
-                select_fields.append(fn.Sum(self.table[measure], 'Count'))
-            else:
-                select_fields.append(fn.Sum(self.table[measure], measure))
+            if measure in select_fields:
+                select_fields.remove(measure)
+                group_fields.remove(measure)
+                # Decide column name based on whether 'subject' fields are present
+                if measure in ['FPE', 'FTE'] and not self.contains_subject():
+                    measures.append(fn.Sum(self.table[measure], 'Count'))
+                else:
+                    measures.append(fn.Sum(self.table[measure], measure))
+        select_fields.extend(measures)
 
         q = Query(). \
             from_(self.table). \

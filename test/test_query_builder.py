@@ -20,7 +20,7 @@ def test_query_builder():
     )
 
     query = query_builder.create_query()
-    assert query[0] == 'SELECT * FROM [dbo].[v_extract_test] WITH(NOLOCK)'
+    assert query[0] == 'SELECT * FROM "dbo"."v_extract_test"'
 
 
 def test_subset_query_builder():
@@ -31,6 +31,9 @@ def test_subset_query_builder():
     metadata = Metadata()
     item = Item()
     item.name = 'fruit'
+    metadata.add_item(item)
+    item = Item()
+    item.name = 'volume'
     metadata.add_item(item)
 
     configuration = Configuration()
@@ -55,9 +58,10 @@ def test_subset_query_builder_multiple_measures():
     dataset_specification.measures.append('weight')
 
     metadata = Metadata()
-    item = Item()
-    item.name = 'fruit'
-    metadata.add_item(item)
+    for field in ['fruit', 'volume', 'weight']:
+        item = Item()
+        item.name = field
+        metadata.add_item(item)
 
     configuration = Configuration()
     configuration.schema = 'dbo'
@@ -85,9 +89,10 @@ def test_subset_query_builder_with_constraint():
     dataset_specification.constraints.append(constraint)
 
     metadata = Metadata()
-    item = Item()
-    item.name = 'fruit'
-    metadata.add_item(item)
+    for field in ['fruit', 'colour', 'volume']:
+        item = Item()
+        item.name = field
+        metadata.add_item(item)
 
     configuration = Configuration()
     configuration.schema = 'dbo'
@@ -103,3 +108,33 @@ def test_subset_query_builder_with_constraint():
     assert query[0] == 'SELECT "fruit","colour",SUM("volume") "volume" FROM "dbo"."v_extract_test" ' \
                        'WHERE "colour" IN (?,?) GROUP BY "fruit","colour"'
     assert query[1] == ['yellow', 'orange']
+
+
+def test_subset_query_builder_with_calculated_field():
+    dataset_specification = DatasetSpecification()
+    dataset_specification.dimensions.append('fruit')
+    dataset_specification.measures.append('price')
+    dataset_specification.measures.append('profit')
+    dataset_specification.measures.append('profit ratio')
+
+    metadata = Metadata()
+    for field in ['fruit', 'price', 'profit', 'profit ratio']:
+        item = Item()
+        item.name = field
+        metadata.add_item(item)
+
+    metadata.get_metadata('profit ratio').set_property('formula', 'profit/price')
+
+    configuration = Configuration()
+    configuration.schema = 'dbo'
+    configuration.view = 'v_extract_test'
+
+    query_builder = SubsetQueryBuilder(
+        dataset_specification=dataset_specification,
+        metadata=metadata,
+        configuration=configuration
+    )
+
+    query = query_builder.create_query()
+    assert query[0] == 'SELECT "fruit",SUM("price") "price",SUM("profit") "profit" ' \
+                       'FROM "dbo"."v_extract_test" GROUP BY "fruit"'
