@@ -3,3 +3,4 @@ pantab~=3.0.2
 tableauhyperapi~=0.0.18161
 tableau-builder==0.18
 pypika
+sqlalchemy
