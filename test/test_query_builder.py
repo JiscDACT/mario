@@ -107,7 +107,7 @@ def test_subset_query_builder_with_constraint():
     query = query_builder.create_query()
     assert query[0] == 'SELECT "fruit","colour",SUM("volume") "volume" FROM "dbo"."v_extract_test" ' \
                        'WHERE "colour" IN (%(colour0)s,%(colour1)s) GROUP BY "fruit","colour"'
-    assert query[1] == [{'colour0': 'yellow'}, {'colour1': 'orange'}]
+    assert query[1] == {'colour0': 'yellow', 'colour1': 'orange'}
 
 
 def test_subset_query_builder_with_calculated_field():
