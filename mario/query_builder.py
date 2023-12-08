@@ -120,12 +120,17 @@ class SubsetQueryBuilder(QueryBuilder):
         clauses = []
         for constraint in self.dataset_specification.constraints:
             column = constraint.item
-            self.parameters.extend(constraint.allowed_values)
             placeholders = []
             for i in range(len(constraint.allowed_values)):
-                placeholders.append(Parameter('?'))
+                parameter_name = column.replace(" ", "_") + str(i)
+                # Postgres style.
+                # TODO Probably need some way of identifying which parameter style to apply.
+                parameter = Parameter('%('+parameter_name+')s')
+                placeholders.append(parameter)
+                self.parameters.append({parameter_name: constraint.allowed_values[i]})
             clauses.append(self.table[column].isin(placeholders))
 
         q = q.where(Criterion.all(clauses))
         return q
+
 
