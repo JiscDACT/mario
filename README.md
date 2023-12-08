@@ -130,7 +130,6 @@ from the same source, in different formats:
 
 ## Roadmap
 
-* Execute queries using PyODBC and SQLAlchemy
 * Create DataSpecification from "SpecificationInputTemplate.xlsx" 
 * Excel Pivot output format
 * Excel Info Sheet output
