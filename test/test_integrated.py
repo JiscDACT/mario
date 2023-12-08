@@ -31,7 +31,7 @@ def test_integration_csv():
     builder.build(file_path=path, output_format=Format.CSV)
 
 
-@pytest.skip
+@pytest.mark.skip
 def test_sql_extraction():
     # Set up local test database, drivers and connection string to run this
     dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
