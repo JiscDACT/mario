@@ -22,4 +22,4 @@ jobs:
           virtual-environment: env/
           local: true
           # These are issues with the audit checker itself!
-          ignore-vulns: PYSEC-2023-74 PYSEC-2022-43012 PYSEC-2023-228
+          ignore-vulns: PYSEC-2023-74 PYSEC-2022-43012 PYSEC-2023-228 PYSEC-2023-221
