@@ -62,7 +62,7 @@ class SubsetQueryBuilder(QueryBuilder):
         )
         self.table = Table(self.configuration.view, schema=self.configuration.schema)
         self.years = self.dataset_specification.get_property('years')
-        self.parameters = []
+        self.parameters = {}
         self.onward_use_category = self.dataset_specification.get_property('onwardUseCategory')
         logger.debug("Query builder using table " + str(self.table))
 
@@ -127,7 +127,7 @@ class SubsetQueryBuilder(QueryBuilder):
                 # TODO Probably need some way of identifying which parameter style to apply.
                 parameter = Parameter('%('+parameter_name+')s')
                 placeholders.append(parameter)
-                self.parameters.append({parameter_name: constraint.allowed_values[i]})
+                self.parameters[parameter_name] = constraint.allowed_values[i]
             clauses.append(self.table[column].isin(placeholders))
 
         q = q.where(Criterion.all(clauses))
