@@ -1,0 +1,22 @@
+{
+    "client": "test@jisc.ac.uk",
+    "customerRef": "test",
+    "datasource": "Superstore",
+    "items": [
+        {
+            "fieldName": "Ship Mode",
+            "allowedValues": ["First Class"]
+        },
+        {
+            "description": "Category of item",
+            "fieldName": "Category"
+        },
+        {
+            "description": "Name of the product",
+            "fieldName": "Product Name"
+        }
+    ],
+    "jobSubmitted": "2023-10-09 17:25:32.486624",
+    "measure": "Sales",
+    "orderRef": "manifest_test"
+}
