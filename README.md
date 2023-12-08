@@ -97,6 +97,24 @@ if extractor.validate_data():
     builder.build(file_path=path, output_format=Format.TABLEAU_PACKAGED_DATASOURCE)
 ~~~
 
+## Example: Using an Apache Airflow hook
+
+~~~
+dataset = dataset_from_manifest("manifest.json")
+metadata = metadata_from_manifest('manifest.json')
+configuration = Configuration(
+    hook=PostgresHook(conn_id='postgres-default'),
+    view='v_student_fpe',
+    schema='dbo',
+    query_builder=SubsetQueryBuilder
+)
+extractor = DataExtractor(configuration=configuration, dataset_specification=dataset, metadata=metadata)
+if extractor.validate_data():
+    builder = DatasetBuilder(dataset_specification=dataset, metadata=metadata, data=extractor)
+    path = os.path.join('datasources', dataset.collection, dataset.name + '.tdsx')
+    builder.build(file_path=path, output_format=Format.TABLEAU_PACKAGED_DATASOURCE)
+~~~
+
 
 ## Example: Multiple outputs
 The same builder can be used to build multiple outputs 
