@@ -54,10 +54,16 @@ class DatasetBuilder:
     def build(self, output_format: Format, file_path: str):
         if output_format == Format.TABLEAU_PACKAGED_DATASOURCE:
             self.__build_tdsx__(file_path)
+        elif output_format == Format.CSV:
+            self.__build_csv__(file_path)
+        elif output_format == Format.EXCEL_PIVOT:
+            self.__build_excel_pivot__(file_path)
+        else:
+            raise NotImplementedError
 
     def __build_excel_pivot__(self, file_path: str):
         # TODO export Excel and Info sheet using OpenPyxl - see code in Automation2.0 and TDSA.
-        pass
+        raise NotImplementedError
 
     def __build_csv__(self, file_path: str):
         # TODO export Info sheet as well - see code in Automation2.0 and TDSA.
