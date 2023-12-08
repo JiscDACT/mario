@@ -3,6 +3,7 @@ import shutil
 
 import pandas as pd
 import pantab
+from airflow.providers.common.sql.hooks.sql import DbApiHook
 from pandas import DataFrame
 from tableauhyperapi import TableName
 
@@ -24,14 +25,14 @@ class Configuration:
 
     def __init__(self,
                  connection_string: str = None,
-                 hook=None,
+                 hook: DbApiHook = None,
                  view: str = None,
                  schema: str = None,
                  file_path: str = None,
                  query_builder=None
                  ):
         self.connection_string = connection_string
-        self.hook = hook
+        self.hook: DbApiHook = hook
         self.view = view
         self.schema = schema
         self.file_path = file_path
@@ -60,17 +61,21 @@ class DataExtractor:
                 else:
                     raise ValueError("Unsupported file type")
             elif self.configuration.hook is not None:
-                # TODO something here for Airflow hooks
-                pass
+                self.__load_from_hook__()
             else:
                 self.__load_from_sql__()
 
+    def __load_from_hook__(self):
+        self.__build_query__()
+        logger.info("Executing query using hook")
+        self._data = self.configuration.hook.get_pandas_df(sql=self._query[0], parameters=self._query[1])
+
     def __load_from_sql__(self):
         self.__build_query__()
+        logger.info("Executing query")
         from sqlalchemy import create_engine
         engine = create_engine(self.configuration.connection_string)
         self._data = pd.read_sql(sql=self._query[0], con=engine.connect(), params=self._query[1])
-        logger.info("Executing query")
 
     def __build_query__(self):
         logger.info("Building query")
