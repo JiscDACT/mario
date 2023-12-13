@@ -63,7 +63,14 @@ class DatasetBuilder:
 
     def __build_excel_pivot__(self, file_path: str):
         # TODO export Excel and Info sheet using OpenPyxl - see code in Automation2.0 and TDSA.
-        raise NotImplementedError
+        from mario.excel_builder import ExcelBuilder
+        excel_builder = ExcelBuilder(
+            output_file_path=file_path,
+            dataset_specification=self.dataset_specification,
+            metadata=self.metadata,
+            data_extractor=self.data
+        )
+        excel_builder.create_workbook()
 
     def __build_csv__(self, file_path: str):
         # TODO export Info sheet as well - see code in Automation2.0 and TDSA.
@@ -102,4 +109,3 @@ class DatasetBuilder:
                 use_metadata_groups=True
             )
             shutil.copyfile(src=output_path + '.tdsx', dst=file_path)
-

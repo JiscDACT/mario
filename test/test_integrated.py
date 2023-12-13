@@ -31,6 +31,17 @@ def test_integration_csv():
     builder.build(file_path=path, output_format=Format.CSV)
 
 
+def test_integration_excel():
+    dataset = dataset_from_manifest(os.path.join('test', 'manifest_superstore.json'))
+    metadata = metadata_from_manifest(os.path.join('test', 'manifest_superstore.json'))
+    configuration = Configuration(file_path=os.path.join('test', 'orders.hyper'))
+    extractor = DataExtractor(configuration=configuration, dataset_specification=dataset, metadata=metadata)
+    builder = DatasetBuilder(dataset_specification=dataset, metadata=metadata, data=extractor)
+    path = os.path.join('output', 'test_integration_excel', 'data.xlsx')
+    os.makedirs(os.path.join('output', 'test_integration_excel'), exist_ok=True)
+    builder.build(file_path=path, output_format=Format.EXCEL_PIVOT)
+
+
 @pytest.mark.skip
 def test_sql_extraction():
     # Set up local test database, drivers and connection string to run this
