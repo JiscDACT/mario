@@ -153,7 +153,6 @@ class ExcelBuilder(object):
         row = 32
         for item in self.dataset_specification.items:
             meta = self.metadata.get_metadata(item)
-            print(item)
             ws['A' + str(row)] = item
             if meta.get_property('tdsaDescription'):
                 ws['B' + str(row)] = meta.get_property('tdsaDescription')
