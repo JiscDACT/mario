@@ -79,7 +79,7 @@ class Metadata(Item):
             json.dump(json_representation, file, default=vars)
 
 
-def metadata_from_json(file_path: str = None):
+def metadata_from_json(file_path: str = None) -> Metadata:
     """ Factory method for creating a Metadata instance from a JSON file"""
     metadata = Metadata()
 
@@ -110,7 +110,7 @@ def metadata_from_json(file_path: str = None):
     return metadata
 
 
-def metadata_from_manifest(file_path=None):
+def metadata_from_manifest(file_path=None) -> Metadata:
     """ Factory method for creating a Metadata instance from a JSON file in manifest format"""
     metadata = Metadata()
 
@@ -140,3 +140,29 @@ def metadata_from_manifest(file_path=None):
 
     return metadata
 
+
+def metadata_from_excel(
+        file_path: str = None,
+        name: str = "Metdata",
+        sheet_name: str = 'Pick list',
+        field_name_column: str = 'Field + Options combined'
+) -> Metadata:
+    """ Factory method for creating a Metadata instance from an Excel file"""
+    import pandas as pd
+    pick_list = pd.read_excel(open(file_path, 'rb'), sheet_name=sheet_name, skiprows=1, header=0)
+    pick_list.reset_index()
+    pick_list.fillna('', inplace=True)
+    pick_list.dropna(how='all', axis=1, inplace=True)
+
+    metadata = Metadata()
+    metadata.name = name
+    metadata.set_property('source', file_path)
+    for index, row in pick_list.iterrows():
+        if isinstance(row[field_name_column], str):
+            data_item = Item()
+            data_item.name = row[field_name_column]
+            for key, value in row.to_dict().items():
+                data_item.set_property(key, value)
+            metadata.add_item(data_item)
+
+    return metadata
