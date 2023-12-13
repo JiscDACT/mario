@@ -143,3 +143,67 @@ def get_year_starts(years):
         year_start = int(year.split('/')[0])
         year_starts.append(year_start)
     return year_starts
+
+
+def dataset_from_excel(file_path: str):
+    from openpyxl import load_workbook
+    from openpyxl.workbook import Workbook
+    from openpyxl.worksheet.worksheet import Worksheet
+
+    content = {
+        'Enquiry Number': 'A3',
+        'Organisation Name': 'A6',
+        'Licence expiry date': 'A9',
+        'Data Format': 'C5',
+        'Onward use': 'C13',
+        'Additional restrictions': 'C15'
+    }
+
+    dataset_specification = DatasetSpecification()
+
+    # Load sheet
+    workbook: Workbook = load_workbook(filename=file_path, read_only=True)
+    sheet: Worksheet = workbook.get_sheet_by_name('InputTemplate')
+
+    # Read general spec values
+    dataset_specification.name = sheet['C2'].value
+    dataset_specification.collection = sheet['C8'].value
+    for prop in content.items():
+        value = sheet[prop[1]].value
+        dataset_specification.set_property(prop[0], value)
+
+    # Read fields
+    cell_range = 'E3:E100'
+    for row in sheet[cell_range]:
+        for cell in row:
+            if cell.value:
+                dataset_specification.dimensions.append(cell.value)
+
+    # Measure
+    dataset_specification.measures = [sheet['C22'].value]
+
+    # Constraints
+    constraints = []
+
+    # Years
+    spec_year = sheet['C11'].value
+    year_start = int(spec_year[0:4])
+    year_end = year_start
+    spec_year = spec_year.replace("—", "-")
+    if spec_year.find('-') != -1:
+        year_end = int(spec_year.split('-')[1].strip())
+
+    years_constraint = Constraint()
+    years_constraint.item = 'Academic year'
+    years_constraint.allowed_values = list(range(year_start, year_end + 1))
+    constraints.append(years_constraint)
+
+    # Onward use
+    onward_use_constraint = Constraint()
+    onward_use_constraint.item = 'Onward use category'
+    onward_use_constraint.allowed_values = [sheet['C13'].value]
+    constraints.append(onward_use_constraint)
+
+    dataset_specification.constraints = constraints
+
+    return dataset_specification
