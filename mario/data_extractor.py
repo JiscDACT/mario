@@ -149,9 +149,11 @@ class DataExtractor:
             raise ValueError("Data validation failed - check the logs for details")
         return True
 
-    def get_data_frame(self) -> DataFrame:
+    def get_data_frame(self, minimise=True) -> DataFrame:
         if self._data is None:
             self.__load__()
+        if minimise:
+            self.__minimise_data__()
         return self._data
 
     def save_query(self, file_path: str):
@@ -164,15 +166,6 @@ class DataExtractor:
             self.__build_query__()
         with open(file_path, mode='w') as file:
             file.write(self._query[0])
-
-    def save_data_as_excel(self, file_path: str, minimise=True):
-        if self._data is None:
-            self.__load__()
-        if minimise:
-            self.__minimise_data__()
-        # TODO use OpenPyxl here, or drop this method
-        self._data.to_csv(file_path)
-        pass
 
     def save_data_as_csv(self, file_path: str, minimise=True):
         if self._data is None:
