@@ -5,3 +5,4 @@ tableau-builder==0.18
 pypika
 sqlalchemy
 apache-airflow-providers-common-sql
+openpyxl
