@@ -39,7 +39,7 @@ def test_integration_excel():
     builder = DatasetBuilder(dataset_specification=dataset, metadata=metadata, data=extractor)
     path = os.path.join('output', 'test_integration_excel', 'data.xlsx')
     os.makedirs(os.path.join('output', 'test_integration_excel'), exist_ok=True)
-    builder.build(file_path=path, output_format=Format.EXCEL_PIVOT)
+    builder.build(file_path=path, output_format=Format.EXCEL_PIVOT, template_path='excel_template.xlsx')
 
 
 @pytest.mark.skip

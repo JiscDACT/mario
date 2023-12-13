@@ -32,12 +32,16 @@ class ExcelBuilder(object):
                  output_file_path: str,
                  data_extractor: DataExtractor,
                  dataset_specification: DatasetSpecification,
-                 metadata: Metadata):
+                 metadata: Metadata,
+                 template_path: str
+                 ):
         self.data_extractor = data_extractor
         self.dataset_specification = dataset_specification
         self.metadata = metadata
         self.filepath = output_file_path
         self.template = "excel_template.xlsx"
+        if template_path is not None:
+            self.template = template_path
         self.workbook = None
         self.rows = None
         self.cols = None

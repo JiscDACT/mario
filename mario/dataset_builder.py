@@ -51,24 +51,24 @@ class DatasetBuilder:
             logger.info(self.dataset_specification.name + ": All metadata present")
             return True
 
-    def build(self, output_format: Format, file_path: str):
+    def build(self, output_format: Format, file_path: str, template_path: str = None):
         if output_format == Format.TABLEAU_PACKAGED_DATASOURCE:
             self.__build_tdsx__(file_path)
         elif output_format == Format.CSV:
             self.__build_csv__(file_path)
         elif output_format == Format.EXCEL_PIVOT:
-            self.__build_excel_pivot__(file_path)
+            self.__build_excel_pivot__(file_path, template_path)
         else:
             raise NotImplementedError
 
-    def __build_excel_pivot__(self, file_path: str):
-        # TODO export Excel and Info sheet using OpenPyxl - see code in Automation2.0 and TDSA.
+    def __build_excel_pivot__(self, file_path: str, template_path: str):
         from mario.excel_builder import ExcelBuilder
         excel_builder = ExcelBuilder(
             output_file_path=file_path,
             dataset_specification=self.dataset_specification,
             metadata=self.metadata,
-            data_extractor=self.data
+            data_extractor=self.data,
+            template_path=template_path
         )
         excel_builder.create_workbook()
 
