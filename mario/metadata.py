@@ -149,6 +149,7 @@ def metadata_from_excel(
 ) -> Metadata:
     """ Factory method for creating a Metadata instance from an Excel file"""
     import pandas as pd
+    import re
     pick_list = pd.read_excel(open(file_path, 'rb'), sheet_name=sheet_name, skiprows=1, header=0)
     pick_list.reset_index()
     pick_list.fillna('', inplace=True)
@@ -163,6 +164,13 @@ def metadata_from_excel(
             data_item.name = row[field_name_column]
             for key, value in row.to_dict().items():
                 data_item.set_property(key, value)
+            # Domain splits
+            pattern = re.compile(".*\((.*)\)")
+            if re.match(pattern, data_item.name):
+                found = re.match(pattern, data_item.name).groups()[0]
+                domain = [x.strip() for x in found.split('/')]
+                if len(domain) > 1:
+                    data_item.set_property('domain', domain)
             metadata.add_item(data_item)
 
     return metadata
