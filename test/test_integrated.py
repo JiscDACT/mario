@@ -42,6 +42,17 @@ def test_integration_excel():
     builder.build(file_path=path, output_format=Format.EXCEL_PIVOT, template_path='excel_template.xlsx')
 
 
+def test_integration_excel_info_only():
+    dataset = dataset_from_manifest(os.path.join('test', 'manifest_superstore.json'))
+    metadata = metadata_from_manifest(os.path.join('test', 'manifest_superstore.json'))
+    configuration = Configuration(file_path=os.path.join('test', 'orders.hyper'))
+    extractor = DataExtractor(configuration=configuration, dataset_specification=dataset, metadata=metadata)
+    builder = DatasetBuilder(dataset_specification=dataset, metadata=metadata, data=extractor)
+    path = os.path.join('output', 'test_integration_excel_info', 'info.xlsx')
+    os.makedirs(os.path.join('output', 'test_integration_excel_info'), exist_ok=True)
+    builder.build(file_path=path, output_format=Format.EXCEL_INFO_SHEET, template_path='excel_template.xlsx')
+
+
 @pytest.mark.skip
 def test_sql_extraction():
     # Set up local test database, drivers and connection string to run this

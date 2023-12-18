@@ -19,6 +19,7 @@ class Format(Enum):
     POWER_BI_PACKAGE = 'pbix'
     EXCEL_PIVOT = 'xlsx'
     CSV = 'csv'
+    EXCEL_INFO_SHEET = 'info'
 
 
 class DatasetBuilder:
@@ -58,8 +59,21 @@ class DatasetBuilder:
             self.__build_csv__(file_path)
         elif output_format == Format.EXCEL_PIVOT:
             self.__build_excel_pivot__(file_path, template_path)
+        elif output_format == Format.EXCEL_INFO_SHEET:
+            self.__build_excel_info_sheet(file_path, template_path)
         else:
             raise NotImplementedError
+
+    def __build_excel_info_sheet(self, file_path: str, template_path: str):
+        from mario.excel_builder import ExcelBuilder
+        excel_builder = ExcelBuilder(
+            output_file_path=file_path,
+            dataset_specification=self.dataset_specification,
+            metadata=self.metadata,
+            data_extractor=self.data,
+            template_path=template_path
+        )
+        excel_builder.create_notes_only()
 
     def __build_excel_pivot__(self, file_path: str, template_path: str):
         from mario.excel_builder import ExcelBuilder
