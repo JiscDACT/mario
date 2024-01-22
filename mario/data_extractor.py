@@ -113,6 +113,12 @@ class DataExtractor:
     def validate_data(self):
         data = self.get_data_frame()
         validation_errors = []
+
+        # Check for NULLs
+        if len(data.loc[data.isna().any(axis=1)]) > 0:
+            validation_errors.append("Dataset contains NULLs")
+            logger.warning("Dataset contains NULLs")
+
         for item in self.dataset_specification.items:
             metadata = self.metadata.get_metadata(item)
             # Ignore calculated fields

@@ -1,6 +1,8 @@
 import os
 import tempfile
 
+import pytest
+
 from mario.data_extractor import DataExtractor, Configuration
 from mario.dataset_specification import dataset_from_json
 from mario.metadata import metadata_from_json
@@ -39,6 +41,25 @@ def test_csv_to_hyper():
 
 def test_hyper_to_csv():
     dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
+    metadata = metadata_from_json(os.path.join('test', 'metadata.json'))
+    configuration = Configuration(
+        file_path=os.path.join('test', 'orders.hyper')
+    )
+    extractor = DataExtractor(
+        dataset_specification=dataset,
+        metadata=metadata,
+        configuration=configuration
+    )
+    with pytest.raises(ValueError):
+        extractor.validate_data()
+    with tempfile.NamedTemporaryFile(suffix='.csv') as file:
+        extractor.save_data_as_csv(file_path=file.name)
+
+
+def test_hyper_to_csv_without_nulls():
+    dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
+    # postal code has NULLs
+    dataset.dimensions.remove('Postal Code')
     metadata = metadata_from_json(os.path.join('test', 'metadata.json'))
     configuration = Configuration(
         file_path=os.path.join('test', 'orders.hyper')
