@@ -51,7 +51,7 @@ def test_hyper_to_csv():
         configuration=configuration
     )
     with pytest.raises(ValueError):
-        extractor.validate_data()
+        extractor.validate_data(allow_nulls=False)
     with tempfile.NamedTemporaryFile(suffix='.csv') as file:
         extractor.save_data_as_csv(file_path=file.name)
 
@@ -69,6 +69,6 @@ def test_hyper_to_csv_without_nulls():
         metadata=metadata,
         configuration=configuration
     )
-    extractor.validate_data()
+    extractor.validate_data(allow_nulls=False)
     with tempfile.NamedTemporaryFile(suffix='.csv') as file:
         extractor.save_data_as_csv(file_path=file.name)

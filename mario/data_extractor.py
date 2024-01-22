@@ -110,14 +110,15 @@ class DataExtractor:
                 columns_to_keep.append(item)
         self._data = self._data[columns_to_keep]
 
-    def validate_data(self):
+    def validate_data(self, allow_nulls=True):
         data = self.get_data_frame()
         validation_errors = []
 
         # Check for NULLs
-        if len(data.loc[data.isna().any(axis=1)]) > 0:
-            validation_errors.append("Dataset contains NULLs")
-            logger.warning("Dataset contains NULLs")
+        if allow_nulls is not True:
+            if len(data.loc[data.isna().any(axis=1)]) > 0:
+                validation_errors.append("Dataset contains NULLs")
+                logger.warning("Dataset contains NULLs")
 
         for item in self.dataset_specification.items:
             metadata = self.metadata.get_metadata(item)
