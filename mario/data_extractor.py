@@ -201,7 +201,7 @@ class HyperFile(DataExtractor):
         super().__init__(Configuration(), dataset_specification, metadata)
         self.configuration = configuration
 
-    def validate_data(self):
+    def validate_data(self, allow_nulls=False):
         from tableau_builder.hyper_utils import get_default_table_and_schema, check_column_exists, check_type, \
             check_domain, check_range
 
