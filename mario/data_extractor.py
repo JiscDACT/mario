@@ -3,7 +3,6 @@ import shutil
 
 import pandas as pd
 import pantab
-from airflow.providers.common.sql.hooks.sql import DbApiHook
 from pandas import DataFrame
 from tableauhyperapi import TableName
 
@@ -25,14 +24,14 @@ class Configuration:
 
     def __init__(self,
                  connection_string: str = None,
-                 hook: DbApiHook = None,
+                 hook=None,
                  view: str = None,
                  schema: str = None,
                  file_path: str = None,
                  query_builder=None
                  ):
         self.connection_string = connection_string
-        self.hook: DbApiHook = hook
+        self.hook = hook
         self.view = view
         self.schema = schema
         self.file_path = file_path
