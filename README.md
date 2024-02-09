@@ -14,6 +14,11 @@ Use pip to install:
 
 `pip install mario-data-pipelines`
 
+From v0.20, the default installation doesn't support Tableau Hyper files or TDSX packages. To
+install with those features use
+
+`pip install mario-data-pipelines[Tableau]`
+
 ...or add to requirements.txt.
 
 # Using
