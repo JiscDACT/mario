@@ -4,8 +4,7 @@ import shutil
 import tempfile
 from enum import Enum
 
-from tableau_builder.hyper_utils import get_default_table_and_schema
-from tableau_builder.json_metadata import JsonRepository
+
 
 from mario.data_extractor import DataExtractor
 from mario.dataset_specification import DatasetSpecification
@@ -93,6 +92,8 @@ class DatasetBuilder:
         self.data.save_data_as_csv(file_path=file_path)
 
     def __build_tdsx__(self, file_path: str):
+        from tableau_builder.hyper_utils import get_default_table_and_schema
+        from tableau_builder.json_metadata import JsonRepository
         with tempfile.TemporaryDirectory() as temp_folder:
 
             # Metadata - convert to internal format used for Tableau

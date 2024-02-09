@@ -2,9 +2,7 @@ import logging
 import shutil
 
 import pandas as pd
-import pantab
 from pandas import DataFrame
-from tableauhyperapi import TableName
 
 from mario.dataset_specification import DatasetSpecification
 from mario.metadata import Metadata
@@ -94,6 +92,8 @@ class DataExtractor:
 
     def __load_from_hyper__(self):
         from tableau_builder import hyper_utils
+        import pantab
+        from tableauhyperapi import TableName
         table_parts = hyper_utils.get_default_table_and_schema(hyper_path=self.configuration.file_path)
         table = TableName(table_parts['schema'], table_parts['table'])
         self._data = pantab.frame_from_hyper(
@@ -180,6 +180,8 @@ class DataExtractor:
         self._data.to_csv(file_path)
 
     def save_data_as_hyper(self, file_path: str, table: str = 'Extract', schema: str = 'Extract', minimise=True):
+        import pantab
+        from tableauhyperapi import TableName
         if self._data is None:
             self.__load__()
         table_name = TableName(schema, table)

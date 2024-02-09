@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='mario-pipeline-tools',
-    version='0.19',
+    version='0.20',
     packages=['mario'],
     url='https://github.com/JiscDACT/mario',
     license='all rights reserved',
@@ -18,16 +18,12 @@ setup(
     include_package_data=True,
     install_requires=[
         'pandas',
-        'tableauhyperapi',
-        'pantab',
-        'tableau-builder==0.18',
         'pypika',
         'sqlalchemy',
         'openpyxl'
     ],
     extras_require={
-        'Airflow': ['apache-airflow-providers-common-sql']
+        'Airflow': ['apache-airflow-providers-common-sql'],
+        'Tableau': ['pantab', 'tableauhyperapi', 'tableau-builder==0.18']
     }
-
-
 )
