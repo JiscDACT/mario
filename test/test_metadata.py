@@ -32,8 +32,12 @@ def test_load_tdsa():
 def test_load_excel():
     metadata_file = os.path.join('test', 'spec_example.xlsx')
     metadata = metadata_from_excel(file_path=metadata_file)
+    domain = metadata.get_metadata('Nationality (UK/ EU/ Non-EU/ Unknown) (2022/23 onwards)').get_property('domain')
+    assert 'UK' in domain
+    assert '23 onwards' not in domain
     assert metadata.get_metadata('ShipMode (First Class / Same Day / Second Class/Standard Class)') is not None
     assert metadata.get_metadata('Region') is not None
     assert metadata.get_metadata('ShipMode (First Class / Same Day / Second Class/Standard Class)').get_property('domain') is not None
     domain = metadata.get_metadata('ShipMode (First Class / Same Day / Second Class/Standard Class)').get_property('domain')
     assert 'First Class' in domain
+
