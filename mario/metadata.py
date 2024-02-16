@@ -165,10 +165,10 @@ def metadata_from_excel(
             for key, value in row.to_dict().items():
                 data_item.set_property(key, value)
             # Domain splits
-            pattern = re.compile(".*\((.*)\)")
-            if re.match(pattern, data_item.name):
-                found = re.match(pattern, data_item.name).groups()[0]
-                domain = [x.strip() for x in found.split('/')]
+            pattern = re.compile("\\(([^)]*)\\)")
+            found = re.findall(pattern, data_item.name)
+            if found:
+                domain = [x.strip() for x in found[0].split('/')]
                 if len(domain) > 1:
                     data_item.set_property('domain', domain)
             metadata.add_item(data_item)
