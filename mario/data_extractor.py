@@ -26,7 +26,8 @@ class Configuration:
                  view: str = None,
                  schema: str = None,
                  file_path: str = None,
-                 query_builder=None
+                 query_builder=None,
+                 user: str = None
                  ):
         self.connection_string = connection_string
         self.hook = hook
@@ -34,6 +35,7 @@ class Configuration:
         self.schema = schema
         self.file_path = file_path
         self.query_builder = query_builder
+        self.user = user
 
 
 class DataExtractor:
@@ -271,3 +273,83 @@ class HyperFile(DataExtractor):
         if minimise:
             self.__minimise_data__()
         shutil.copyfile(self.configuration.file_path, file_path)
+
+
+class StreamingDataExtractor(DataExtractor):
+    """
+    Extension to basic data extractor with additional functions
+    supporting streaming data from SQL to output formats without
+    holding any data in memory using a data frame
+    """
+    def __init__(self,
+                 configuration: Configuration,
+                 dataset_specification: DatasetSpecification,
+                 metadata: Metadata
+                 ):
+        super().__init__(configuration, dataset_specification, metadata)
+
+    def get_connection(self):
+        from sqlalchemy import create_engine
+        engine = create_engine(self.configuration.connection_string)
+        connection = engine.connect().execution_options(stream_results=True)
+        return connection
+
+    def stream_sql_to_hyper(self, file_path: str, table: str = 'Extract', schema: str = 'Extract', chunk_size: int = 100000):
+        """
+        Write From SQL to .hyper using streaming. No data is held in memory.
+        """
+        self.__build_query__()
+        logger.info("Executing query")
+        from tableauhyperapi import TableName
+        from pantab import frame_to_hyper
+
+        connection = self.get_connection()
+        table_name = TableName(schema, table)
+        for df in pd.read_sql(self._query[0], connection, chunksize=chunk_size):
+            print(len(df))
+            frame_to_hyper(df, database=file_path, table=table_name, table_mode='a')
+
+    def stream_sql_to_csv(self, file_path, chunk_size: int = 100000):
+        """
+        Write From SQL to CSV using streaming. No data is held in memory.
+        """
+        self.__build_query__()
+        logger.info("Executing query")
+        connection = self.get_connection()
+
+        mode = 'w'
+        header = True
+        for df in pd.read_sql(self._query[0], connection, chunksize=chunk_size):
+            df.to_csv(file_path, mode=mode, header=header, index=False)
+            if header:
+                header = False
+                mode = "a"
+
+    def stream_sql_to_csv_using_bcp(self, table_name: str, output_file_path: str):
+        """
+        Builds table on server, then extracts it to CSV using the bcp program. No data is held in
+        memory
+        """
+        self.__build_query__()
+        logger.info("Executing query")
+        from sqlalchemy import text
+        import subprocess
+        connection = self.get_connection()
+
+        # Create a table using SQL
+        sql = self._query[0]
+        create_table_sql = sql.replace('select * from (', f'SELECT * INTO dbo.{table_name} FROM')
+        connection.execute(text(create_table_sql))
+
+        # SQL to obtain the column names from the table
+        bcp_columns_sql = f'SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = \'{table_name}\''
+        bcp_columns = [r[0] for r in connection.execute(text(bcp_columns_sql)).fetchall()]
+        bcp_columns_literal = ', '.join(["'" + a + "'" for a in bcp_columns])
+
+        # Union the column names with the extract to get the complete query
+        bcp_select = f"SELECT {bcp_columns_literal} UNION ALL SELECT {','.join(bcp_columns)} FROM [dbo].{table_name}"
+
+        # Export to CSV
+        user = self.configuration.user
+        bcp_code = f'bcp "{bcp_select}" queryout {output_file_path} csv -d DW_Enterprise -c -C RAW -U {user} -S t01-dwhouse.database.windows.net -G'  # 65001 for utf-8 // RAW for same data
+        subprocess.call(bcp_code)
