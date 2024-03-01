@@ -287,6 +287,7 @@ class StreamingDataExtractor(DataExtractor):
                  metadata: Metadata
                  ):
         super().__init__(configuration, dataset_specification, metadata)
+        self._data = None
 
     def get_connection(self):
         from sqlalchemy import create_engine
@@ -294,9 +295,17 @@ class StreamingDataExtractor(DataExtractor):
         connection = engine.connect().execution_options(stream_results=True)
         return connection
 
-    def stream_sql_to_hyper(self, file_path: str, table: str = 'Extract', schema: str = 'Extract', chunk_size: int = 100000):
+    def stream_sql_to_hyper(self,
+                            file_path: str,
+                            table: str = 'Extract',
+                            schema: str = 'Extract',
+                            validate: bool = False,
+                            allow_nulls: bool = False,
+                            chunk_size: int = 100000):
         """
-        Write From SQL to .hyper using streaming. No data is held in memory.
+        Write From SQL to .hyper using streaming. No data is held in memory
+        apart from chunks of rows as they are read.
+        Optionally, data can be validated as it is read.
         """
         self.__build_query__()
         logger.info("Executing query")
@@ -306,12 +315,20 @@ class StreamingDataExtractor(DataExtractor):
         connection = self.get_connection()
         table_name = TableName(schema, table)
         for df in pd.read_sql(self._query[0], connection, chunksize=chunk_size):
-            print(len(df))
+            if validate:
+                self._data = df
+                self.validate_data(allow_nulls=allow_nulls)
             frame_to_hyper(df, database=file_path, table=table_name, table_mode='a')
 
-    def stream_sql_to_csv(self, file_path, chunk_size: int = 100000):
+    def stream_sql_to_csv(self,
+                          file_path,
+                          validate: bool = False,
+                          allow_nulls: bool = False,
+                          chunk_size: int = 100000):
         """
-        Write From SQL to CSV using streaming. No data is held in memory.
+        Write From SQL to CSV using streaming. No data is held in memory
+        apart from chunks of rows as they are read.
+        Optionally, data can be validated as it is read.
         """
         self.__build_query__()
         logger.info("Executing query")
@@ -320,6 +337,9 @@ class StreamingDataExtractor(DataExtractor):
         mode = 'w'
         header = True
         for df in pd.read_sql(self._query[0], connection, chunksize=chunk_size):
+            if validate:
+                self._data = df
+                self.validate_data(allow_nulls=allow_nulls)
             df.to_csv(file_path, mode=mode, header=header, index=False)
             if header:
                 header = False
@@ -328,7 +348,7 @@ class StreamingDataExtractor(DataExtractor):
     def stream_sql_to_csv_using_bcp(self, table_name: str, output_file_path: str):
         """
         Builds table on server, then extracts it to CSV using the bcp program. No data is held in
-        memory
+        memory. Data cannot be validated without reading it in from the generated CSV
         """
         self.__build_query__()
         logger.info("Executing query")
