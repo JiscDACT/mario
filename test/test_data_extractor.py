@@ -155,3 +155,47 @@ def test_stream_sql_to_csv_with_validation():
     file = tempfile.NamedTemporaryFile(suffix='.csv')
     with pytest.raises(ValueError):
         extractor.stream_sql_to_csv(file_path=file.name, validate=True, chunk_size=1000)
+
+
+def test_column_mapping():
+    # Skip this test if we don't have a connection string
+    if not os.environ.get('CONNECTION_STRING'):
+        pytest.skip("Skipping SQL test as no database configured")
+
+    dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
+    # Rename 'region' to area
+    dataset.dimensions.remove('Region')
+    dataset.dimensions.append('Area')
+    metadata = metadata_from_json(os.path.join('test', 'metadata.json'))
+    meta = metadata.get_metadata('Region')
+    meta.name = 'Area'
+    meta.set_property('output_name', 'Region')
+    assert metadata.get_metadata('Area') is not None
+    assert metadata.get_metadata('Region') is None
+    assert 'Area' in dataset.dimensions
+    assert 'Region' not in dataset.dimensions
+
+    configuration = Configuration(
+        connection_string=os.environ.get('CONNECTION_STRING'),
+        schema="dev",
+        view="superstore",
+        query_builder=ViewBasedQueryBuilder
+    )
+    extractor = StreamingDataExtractor(
+        dataset_specification=dataset,
+        metadata=metadata,
+        configuration=configuration
+    )
+    file = tempfile.NamedTemporaryFile(suffix='.csv')
+    extractor.stream_sql_to_csv(
+        file_path=file.name,
+        validate=True,
+        chunk_size=1000
+    )
+    df = pd.read_csv(file.name)
+    assert 'Region' in df.columns
+
+
+
+
+

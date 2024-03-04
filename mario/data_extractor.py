@@ -103,12 +103,20 @@ class DataExtractor:
             table=table
         )
 
+    def __get_column_name__(self, item: str):
+        """ Returns the column name for a metadata item"""
+        meta = self.metadata.get_metadata(item)
+        if meta.get_property('output_name') is not None:
+            return meta.get_property('output_name')
+        else:
+            return meta.name
+
     def __minimise_data__(self):
         """ Minimise data so we only keep the columns in the spec """
         columns_to_keep = []
         for item in self.dataset_specification.items:
-            if not self.metadata.get_metadata(item).get_property('formula'):
-                columns_to_keep.append(item)
+            if self.metadata.get_metadata(item) and not self.metadata.get_metadata(item).get_property('formula'):
+                columns_to_keep.append(self.__get_column_name__(item))
         self._data = self._data[columns_to_keep]
 
     def validate_data(self, allow_nulls=True):
@@ -123,15 +131,16 @@ class DataExtractor:
 
         for item in self.dataset_specification.items:
             metadata = self.metadata.get_metadata(item)
+            column = self.__get_column_name__(item)
             # Ignore calculated fields
             if metadata.get_property('formula') is None:
                 # Check all columns present
-                if item not in data.columns:
+                if column not in data.columns:
                     validation_errors.append("Item missing: " + item)
                 else:
                     # Check domain
                     if metadata.get_property('domain') is not None:
-                        data_domain = data[item].unique()
+                        data_domain = data[column].unique()
                         metadata_domain = metadata.get_property('domain')
                         for element in data_domain:
                             if element not in metadata_domain:
@@ -141,8 +150,8 @@ class DataExtractor:
                     if metadata.get_property('range') is not None:
                         min_value = metadata.get_property('range')[0]
                         max_value = metadata.get_property('range')[1]
-                        data_min = data[item].min()
-                        data_max = data[item].max()
+                        data_min = data[column].min()
+                        data_max = data[column].max()
                         if data_min < min_value:
                             validation_errors.append("Range validation failed for " + item)
                             logger.error("Validation error: '" + str(data_min) + "' is less than " + str(min_value))
