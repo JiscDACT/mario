@@ -147,11 +147,11 @@ def get_year_starts(years):
 
 def dataset_from_excel(file_path: str):
     from openpyxl import load_workbook
-    from openpyxl.workbook import Workbook
     from openpyxl.worksheet.worksheet import Worksheet
 
     content = {
         'Enquiry Number': 'A3',
+        'Item Number': 'C2',
         'Organisation Name': 'A6',
         'Licence expiry date': 'A9',
         'Data Format': 'C5',
@@ -162,7 +162,7 @@ def dataset_from_excel(file_path: str):
     dataset_specification = DatasetSpecification()
 
     # Load sheet
-    workbook: Workbook = load_workbook(filename=file_path, read_only=True)
+    workbook = load_workbook(filename=file_path, read_only=True)
     sheet: Worksheet = workbook.get_sheet_by_name('InputTemplate')
 
     # Read general spec values
@@ -204,6 +204,18 @@ def dataset_from_excel(file_path: str):
     onward_use_constraint.allowed_values = [sheet['C13'].value]
     constraints.append(onward_use_constraint)
 
+    # Other restrictions - c15 to c19
+    for cell in ['C15', 'C16', 'C17', 'C18', 'C19']:
+        if sheet[cell].value is not None:
+            constraint = Constraint()
+            constraint.item = sheet[cell].value
+            constraints.append(constraint)
+
     dataset_specification.constraints = constraints
+
+    # Deal with windows greedy file handler madness
+    workbook.close()
+    import gc
+    gc.collect()
 
     return dataset_specification
