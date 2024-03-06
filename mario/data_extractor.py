@@ -367,7 +367,7 @@ class StreamingDataExtractor(DataExtractor):
 
         # Create a table using SQL
         sql = self._query[0]
-        create_table_sql = sql.replace('select * from (', f'SELECT * INTO dbo.{table_name} FROM')
+        create_table_sql = sql.replace('select * from (', f'SELECT * INTO dbo.{table_name} FROM (')
         connection.execute(text(create_table_sql))
 
         # SQL to obtain the column names from the table
@@ -380,5 +380,5 @@ class StreamingDataExtractor(DataExtractor):
 
         # Export to CSV
         user = self.configuration.user
-        bcp_code = f'bcp "{bcp_select}" queryout {output_file_path} csv -d DW_Enterprise -c -C RAW -U {user} -S t01-dwhouse.database.windows.net -G'  # 65001 for utf-8 // RAW for same data
+        bcp_code = f'bcp "{bcp_select}" queryout {output_file_path} -d DW_Enterprise -c -C RAW -U {user} -S t01-dwhouse.database.windows.net -G'  # 65001 for utf-8 // RAW for same data
         subprocess.call(bcp_code)
