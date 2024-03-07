@@ -354,31 +354,47 @@ class StreamingDataExtractor(DataExtractor):
                 header = False
                 mode = "a"
 
-    def stream_sql_to_csv_using_bcp(self, table_name: str, output_file_path: str):
-        """
-        Builds table on server, then extracts it to CSV using the bcp program. No data is held in
-        memory. Data cannot be validated without reading it in from the generated CSV
-        """
-        self.__build_query__()
-        logger.info("Executing query")
-        from sqlalchemy import text
-        import subprocess
-        connection = self.get_connection()
 
-        # Create a table using SQL
-        sql = self._query[0]
-        create_table_sql = sql.replace('select * from (', f'SELECT * INTO dbo.{table_name} FROM (')
-        connection.execute(text(create_table_sql))
+def stream_sql_to_csv_using_bcp(self, table_name: str, output_file_path: str):
+    """
+    Builds table on server, then extracts it to CSV using the bcp program. No data is held in
+    memory. Data cannot be validated without reading it in from the generated CSV.
+    TODO Note that the generated SQL must start with 'SELECT * FROM' - make this more generic
+    TODO Provide an option to not drop/create table if it already exists.
+    """
+    self.__build_query__()
+    logger.info("Executing query")
+    from sqlalchemy import text
+    import subprocess
 
-        # SQL to obtain the column names from the table
-        bcp_columns_sql = f'SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = \'{table_name}\''
-        bcp_columns = [r[0] for r in connection.execute(text(bcp_columns_sql)).fetchall()]
-        bcp_columns_literal = ', '.join(["'" + a + "'" for a in bcp_columns])
+    # Get a connection
+    connection = self.get_connection()
 
-        # Union the column names with the extract to get the complete query
-        bcp_select = f"SELECT {bcp_columns_literal} UNION ALL SELECT {','.join(bcp_columns)} FROM [dbo].{table_name}"
+    # Drop the table if it already exists
+    drop_table_sql = f'DROP TABLE IF EXISTS {self.configuration.schema}.{table_name};'
+    connection.execute(text(drop_table_sql))
+    connection.commit()
+    logger.debug('drop table: ' + drop_table_sql)
 
-        # Export to CSV
-        user = self.configuration.user
-        bcp_code = f'bcp "{bcp_select}" queryout {output_file_path} -d DW_Enterprise -c -C RAW -U {user} -S t01-dwhouse.database.windows.net -G'  # 65001 for utf-8 // RAW for same data
-        subprocess.call(bcp_code)
+    # Create a table using SQL
+    sql = self._query[0]
+    create_table_sql = sql.replace('SELECT * FROM (', f'SELECT * INTO dbo.{table_name} FROM (')
+    connection.execute(text(create_table_sql))
+    connection.commit()
+    logger.debug('create table: ' + create_table_sql)
+
+    # SQL to obtain the column names from the table
+    bcp_columns_sql = f'SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = \'{table_name}\''
+    bcp_columns = [r[0] for r in connection.execute(text(bcp_columns_sql)).fetchall()]
+    bcp_columns_literal = ', '.join(["'" + a + "'" for a in bcp_columns])
+    bcp_columns_select = ["CHAR(34)+CAST([" + a + "] AS VARCHAR(max))+CHAR(34)" for a in bcp_columns]
+    connection.close()
+
+    # Union the column names with the extract to get the complete query
+    bcp_select = f"SELECT {bcp_columns_literal} UNION ALL SELECT {','.join(bcp_columns_select)} FROM [dbo].{table_name}"
+
+    # Export to CSV
+    user = self.configuration.user
+    bcp_code = f'bcp "{bcp_select}" queryout {output_file_path} -d DW_Enterprise -c -C RAW -U {user} -S t01-dwhouse.database.windows.net -G'  # 65001 for utf-8 // RAW for same data
+    logger.debug('bcp command: ' + bcp_code)
+    subprocess.call(bcp_code)
