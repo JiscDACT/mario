@@ -18,6 +18,7 @@ def test_save_metadata():
     metadata = metadata_from_json(file_path=metadata_file)
     metadata.set_property("fruit", "banana")
     with tempfile.NamedTemporaryFile() as file:
+        file.close()
         metadata.save(file_path=file.name)
         metadata = metadata_from_json(file.name)
         assert metadata.get_property('fruit') == 'banana'
