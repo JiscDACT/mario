@@ -13,7 +13,7 @@ class MockQueryBuilder(QueryBuilder):
                  metadata: Metadata,
                  dataset_specification: DatasetSpecification
                  ):
-        self.sql = 'SELECT * FROM (SELECT TOP 10 ProviderName FROM Provider.D_Provider) as tmp'
+        self.sql = 'SELECT * FROM (SELECT TOP 10 name FROM sys.tables) as tmp'
 
     def create_query(self) -> [str, List[any]]:
         return [self.sql, []]

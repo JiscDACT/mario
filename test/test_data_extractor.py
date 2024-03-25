@@ -227,8 +227,8 @@ def test_stream_to_csv_using_bcp():
     extractor.stream_sql_to_csv_using_bcp(
         table_name='v_mario_test',
         output_file_path=file.name,
-        database_name='DW_Enterprise',
+        database_name=os.environ.get('DATABASE'),
         use_view=True,
-        server_url='t01-dwhouse.database.windows.net',
+        server_url=os.environ.get('SERVER'),
         delete_when_finished=True
     )
