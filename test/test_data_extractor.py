@@ -11,6 +11,8 @@ from mario.dataset_specification import dataset_from_json
 from mario.metadata import metadata_from_json
 from mario.query_builder import ViewBasedQueryBuilder
 
+from test.mocks import MockQueryBuilder
+
 logger = logging.getLogger(__name__)
 
 
@@ -27,6 +29,7 @@ def test_csv_to_csv():
     )
     extractor.validate_data()
     with tempfile.NamedTemporaryFile(suffix='.csv') as file:
+        file.close()
         extractor.save_data_as_csv(file_path=file.name)
 
 
@@ -42,6 +45,7 @@ def test_csv_to_hyper():
         configuration=configuration
     )
     with tempfile.NamedTemporaryFile(suffix='.hyper') as file:
+        file.close()
         extractor.save_data_as_hyper(file_path=file.name)
 
 
@@ -59,6 +63,7 @@ def test_hyper_to_csv():
     with pytest.raises(ValueError):
         extractor.validate_data(allow_nulls=False)
     with tempfile.NamedTemporaryFile(suffix='.csv') as file:
+        file.close()
         extractor.save_data_as_csv(file_path=file.name)
 
 
@@ -77,6 +82,7 @@ def test_hyper_to_csv_without_nulls():
     )
     extractor.validate_data(allow_nulls=False)
     with tempfile.NamedTemporaryFile(suffix='.csv') as file:
+        file.close()
         extractor.save_data_as_csv(file_path=file.name)
 
 
@@ -196,6 +202,33 @@ def test_column_mapping():
     assert 'Region' in df.columns
 
 
+def test_stream_to_csv_using_bcp():
+    # Skip this test if we don't have a connection string
+    if not os.environ.get('CONNECTION_STRING'):
+        pytest.skip("Skipping SQL test as no database configured")
+    if not os.environ.get('BCP'):
+        pytest.skip('BCP not available')
+    conn = os.environ.get('CONNECTION_STRING')
 
-
-
+    dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
+    metadata = metadata_from_json(os.path.join('test', 'metadata.json'))
+    configuration = Configuration(
+        connection_string=conn,
+        schema='dbo',
+        query_builder=MockQueryBuilder
+    )
+    extractor = StreamingDataExtractor(
+        dataset_specification=dataset,
+        metadata=metadata,
+        configuration=configuration
+    )
+    file = tempfile.NamedTemporaryFile(suffix='.csv')
+    file.close()  # dumb Windows hack
+    extractor.stream_sql_to_csv_using_bcp(
+        table_name='v_mario_test',
+        output_file_path=file.name,
+        database_name='DW_Enterprise',
+        use_view=True,
+        server_url='t01-dwhouse.database.windows.net',
+        delete_when_finished=True
+    )
