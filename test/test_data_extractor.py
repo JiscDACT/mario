@@ -110,6 +110,30 @@ def test_stream_sql_to_csv():
     assert len(df) == 10194
 
 
+def test_stream_sql_to_csv_with_compression():
+    # Skip this test if we don't have a connection string
+    if not os.environ.get('CONNECTION_STRING'):
+        pytest.skip("Skipping SQL test as no database configured")
+
+    dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
+    metadata = metadata_from_json(os.path.join('test', 'metadata.json'))
+    configuration = Configuration(
+        connection_string=os.environ.get('CONNECTION_STRING'),
+        schema="dev",
+        view="superstore",
+        query_builder=ViewBasedQueryBuilder
+    )
+    extractor = StreamingDataExtractor(
+        dataset_specification=dataset,
+        metadata=metadata,
+        configuration=configuration
+    )
+    file = tempfile.NamedTemporaryFile(suffix='.csv')
+    gzip_path = extractor.stream_sql_to_csv(file_path=file.name, chunk_size=1000, compress_using_gzip=True)
+    df = pd.read_csv(gzip_path)
+    assert len(df) == 10194
+
+
 def test_stream_sql_to_hyper():
     # Skip this test if we don't have a connection string
     if not os.environ.get('CONNECTION_STRING'):

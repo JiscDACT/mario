@@ -333,7 +333,9 @@ class StreamingDataExtractor(DataExtractor):
                           file_path,
                           validate: bool = False,
                           allow_nulls: bool = False,
-                          chunk_size: int = 100000):
+                          chunk_size: int = 100000,
+                          compress_using_gzip: bool = False
+                          ):
         """
         Write From SQL to CSV using streaming. No data is held in memory
         apart from chunks of rows as they are read.
@@ -343,16 +345,24 @@ class StreamingDataExtractor(DataExtractor):
         logger.info("Executing query")
         connection = self.get_connection()
 
+        if compress_using_gzip:
+            compression_options = dict(method='gzip')
+            file_path = file_path + '.gz'
+        else:
+            compression_options = None
+
         mode = 'w'
         header = True
         for df in pd.read_sql(self._query[0], connection, chunksize=chunk_size):
             if validate:
                 self._data = df
                 self.validate_data(allow_nulls=allow_nulls)
-            df.to_csv(file_path, mode=mode, header=header, index=False)
+            df.to_csv(file_path, mode=mode, header=header, index=False, compression=compression_options)
             if header:
                 header = False
                 mode = "a"
+
+        return file_path
 
     def stream_sql_to_csv_using_bcp(self,
                                     table_name: str,
