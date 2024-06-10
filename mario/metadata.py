@@ -75,7 +75,7 @@ class Metadata(Item):
         for item in self._items:
             json_representation['collection']['items'].append(item.to_json())
 
-        with open(file_path, mode='w') as file:
+        with open(file_path, mode='w', encoding='utf-8') as file:
             json.dump(json_representation, file, default=vars)
 
 
@@ -83,7 +83,7 @@ def metadata_from_json(file_path: str = None) -> Metadata:
     """ Factory method for creating a Metadata instance from a JSON file"""
     metadata = Metadata()
 
-    with open(file_path) as metadata_file:
+    with open(file_path, encoding='utf-8') as metadata_file:
         metadata_json = json.load(metadata_file)
 
     if 'collection' in metadata_json:
@@ -114,7 +114,7 @@ def metadata_from_manifest(file_path=None) -> Metadata:
     """ Factory method for creating a Metadata instance from a JSON file in manifest format"""
     metadata = Metadata()
 
-    with open(file_path) as metadata_file:
+    with open(file_path, encoding='utf-8') as metadata_file:
         metadata_json = json.load(metadata_file)
 
     collection = metadata_json
