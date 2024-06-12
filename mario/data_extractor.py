@@ -221,7 +221,7 @@ class HyperFile(DataExtractor):
             expected_type = 'text'
         if str(column.type).lower() == expected_type.lower():
             return True
-        elif str(column.type).lower() == 'big_int' and expected_type.lower == 'int':
+        elif str(column.type).lower() == 'big_int' and expected_type.lower() == 'int':
             logger.warning(f"Validation warning: {column_name} is big_int rather than int")
             return True
         else:
