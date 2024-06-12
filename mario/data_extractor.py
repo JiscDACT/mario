@@ -213,6 +213,22 @@ class HyperFile(DataExtractor):
         super().__init__(Configuration(), dataset_specification, metadata)
         self.configuration = configuration
 
+    def check_type(self, column_name: str, expected_type: str, table_name: str, schema_name: str):
+        from tableau_builder.hyper_utils import get_table
+        table = get_table(hyper_path=self.configuration.file_path, table_name=table_name, schema_name=schema_name)
+        column = table.get_column_by_name(column_name)
+        if expected_type is None:
+            expected_type = 'text'
+        if str(column.type).lower() == expected_type.lower():
+            return True
+        elif str(column.type).lower() == 'big_int' and expected_type.lower == 'int':
+            logger.warning(f"Validation warning: {column_name} is big_int rather than int")
+            return True
+        else:
+            logger.error("Validation error: '" + str(
+                column.type).lower() + "' is not the expected type (" + expected_type + ") for " + column_name)
+            return False
+
     def validate_data(self, allow_nulls=False):
         from tableau_builder.hyper_utils import get_default_table_and_schema, check_column_exists, check_type, \
             check_domain, check_range
@@ -234,8 +250,7 @@ class HyperFile(DataExtractor):
                 ):
                     validation_errors.append("Item missing: " + item)
                 else:
-                    if metadata.get_property('datatype') and not check_type(
-                            hyper_path=self.configuration.file_path,
+                    if metadata.get_property('datatype') and not self.check_type(
                             column_name=item,
                             expected_type=metadata.get_property('datatype'),
                             table_name=table,
