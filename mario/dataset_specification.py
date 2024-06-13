@@ -78,12 +78,12 @@ class DatasetSpecification(MarioBase):
             "dimensions": self.dimensions,
             "measures": self.measures
         }
-        with open(file_path, 'w') as file:
+        with open(file_path, 'w', encoding='utf-8') as file:
             json.dump(json_representation, file, default=vars)
 
 
 def dataset_from_json(file_path: str = None) -> DatasetSpecification:
-    with open(file_path, mode='r') as source_file:
+    with open(file_path, mode='r', encoding='utf-8') as source_file:
         spec = json.load(source_file)
 
     dataset_specification = DatasetSpecification()
@@ -97,7 +97,7 @@ def dataset_from_json(file_path: str = None) -> DatasetSpecification:
 
 
 def dataset_from_manifest(file_path: str = None):
-    with open(file_path, mode='r') as source_file:
+    with open(file_path, mode='r', encoding='utf-8') as source_file:
         spec = json.load(source_file)
 
     dataset_specification = DatasetSpecification()
