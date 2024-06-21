@@ -53,8 +53,11 @@ def test_integration_excel_info_only():
     builder.build(file_path=path, output_format=Format.EXCEL_INFO_SHEET, template_path='excel_template.xlsx')
 
 
-@pytest.mark.skip
 def test_sql_extraction():
+    # Skip this test if we don't have a connection string
+    if not os.environ.get('CONNECTION_STRING'):
+        pytest.skip("Skipping SQL test as no database configured")
+
     # Set up local test database, drivers and connection string to run this
     dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
     metadata = metadata_from_json(os.path.join('test', 'metadata.json'))
@@ -70,7 +73,7 @@ def test_sql_extraction():
 
     configuration = Configuration(
         connection_string=os.environ.get("CONNECTION_STRING"),
-        schema='dbo',
+        schema='dev',
         view='superstore',
         query_builder=SubsetQueryBuilder
     )
@@ -87,14 +90,17 @@ def test_sql_extraction():
     extractor.save_query(sql_path)
 
 
-@pytest.mark.skip
 def test_sql_extraction_using_manifest():
+    # Skip this test if we don't have a connection string
+    if not os.environ.get('CONNECTION_STRING'):
+        pytest.skip("Skipping SQL test as no database configured")
+
     # Set up local test database, drivers and connection string to run this
     dataset = dataset_from_manifest(os.path.join('test', 'manifest_superstore.json'))
     metadata = metadata_from_manifest(os.path.join('test', 'manifest_superstore.json'))
     configuration = Configuration(
         connection_string=os.environ.get("CONNECTION_STRING"),
-        schema='dbo',
+        schema='dev',
         view='superstore',
         query_builder=SubsetQueryBuilder
     )
@@ -109,3 +115,20 @@ def test_sql_extraction_using_manifest():
     os.makedirs(os.path.join('output', 'test_sql_extraction_using_manifest'), exist_ok=True)
     extractor.save_data_as_csv(csv_path)
     extractor.save_query(sql_path)
+
+
+def test_integration_excel_info_only_with_totals():
+    from openpyxl import Workbook, load_workbook
+    dataset = dataset_from_manifest(os.path.join('test', 'manifest_superstore.json'))
+    metadata = metadata_from_manifest(os.path.join('test', 'manifest_superstore.json'))
+    configuration = Configuration(file_path=os.path.join('test', 'orders.hyper'))
+    extractor = DataExtractor(configuration=configuration, dataset_specification=dataset, metadata=metadata)
+    total_from_query = extractor.get_total()
+    builder = DatasetBuilder(dataset_specification=dataset, metadata=metadata, data=extractor)
+    path = os.path.join('output', 'test_integration_excel_info', 'info.xlsx')
+    os.makedirs(os.path.join('output', 'test_integration_excel_info'), exist_ok=True)
+    builder.build(file_path=path, output_format=Format.EXCEL_INFO_SHEET, template_path='excel_template.xlsx')
+    workbook: Workbook = load_workbook(path)
+    total_from_notes = workbook.get_sheet_by_name('Notes')['B15'].value
+    assert total_from_notes == total_from_query
+

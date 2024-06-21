@@ -144,6 +144,8 @@ class ExcelBuilder(object):
         """
         Updates the notes page
         """
+        self.total = self.data_extractor.get_total()
+
         ws['B6'] = self.dataset_specification.collection
         ws['B7'] = self.dataset_specification.get_property('customerRef')
         ws['B9'] = 'Jisc Tailored Datasets App v1.0'
