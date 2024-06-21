@@ -49,6 +49,7 @@ class DataExtractor:
         self.metadata = metadata
         self._data = None
         self._query = None
+        self._total = 0
 
     def __load__(self):
         if self.configuration is not None:
@@ -119,6 +120,11 @@ class DataExtractor:
                 columns_to_keep.append(self.__get_column_name__(item))
         self._data = self._data[columns_to_keep]
 
+    def get_total(self):
+        df = self.get_data_frame()
+        self._total = df[self.dataset_specification.measures[0]].sum()
+        return self._total
+
     def validate_data(self, allow_nulls=True):
         data = self.get_data_frame()
         validation_errors = []
@@ -146,6 +152,10 @@ class DataExtractor:
                             if element not in metadata_domain:
                                 validation_errors.append("Domain validation failed for " + item)
                                 logger.error("Validation error: '" + str(element) + "' is not in domain of " + item)
+                        for metadata_element in metadata_domain:
+                            if metadata_element not in data_domain:
+                                logger.warning(f"Warning: {str(metadata_element)} is not present in the data for {item}")
+
                     # Check range
                     if metadata.get_property('range') is not None:
                         min_value = metadata.get_property('range')[0]
@@ -230,7 +240,7 @@ class HyperFile(DataExtractor):
             return False
 
     def validate_data(self, allow_nulls=False):
-        from tableau_builder.hyper_utils import get_default_table_and_schema, check_column_exists, check_type, \
+        from tableau_builder.hyper_utils import get_default_table_and_schema, check_column_exists, \
             check_domain, check_range
 
         validation_errors = []
@@ -318,6 +328,26 @@ class StreamingDataExtractor(DataExtractor):
         engine = create_engine(self.configuration.connection_string)
         connection = engine.connect().execution_options(stream_results=True)
         return connection
+
+    def get_total(self):
+        """
+        For totals when streaming data we need to run a totals SQL query separate
+        from the main query and use the results of this
+        :return: the total value of the query
+        """
+        logger.info("Building totals query")
+        if self.configuration.query_builder is not None:
+            from mario.query_builder import QueryBuilder
+            query_builder: QueryBuilder = self.configuration.query_builder(
+                configuration=self.configuration,
+                metadata=self.metadata,
+                dataset_specification=self.dataset_specification)
+            totals_query = query_builder.create_totals_query()
+        else:
+            raise NotImplementedError
+
+        totals_df = pd.read_sql(totals_query[0], self.get_connection(), params=totals_query[1])
+        return totals_df.iat[0, 0]
 
     def stream_sql_to_hyper(self,
                             file_path: str,

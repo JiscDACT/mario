@@ -9,7 +9,7 @@ import pytest
 from mario.data_extractor import DataExtractor, Configuration, StreamingDataExtractor
 from mario.dataset_specification import dataset_from_json
 from mario.metadata import metadata_from_json
-from mario.query_builder import ViewBasedQueryBuilder
+from mario.query_builder import ViewBasedQueryBuilder, SubsetQueryBuilder
 
 from test.mocks import MockQueryBuilder
 
@@ -256,3 +256,105 @@ def test_stream_to_csv_using_bcp():
         server_url=os.environ.get('SERVER'),
         delete_when_finished=True
     )
+
+
+def test_hyper_totals():
+    dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
+    metadata = metadata_from_json(os.path.join('test', 'metadata.json'))
+    configuration = Configuration(
+        file_path=os.path.join('test', 'orders.hyper')
+    )
+    extractor = DataExtractor(
+        dataset_specification=dataset,
+        metadata=metadata,
+        configuration=configuration
+    )
+    extractor.validate_data()
+    assert extractor.get_total() == 2326534.3543
+
+
+def test_csv_totals():
+    dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
+    metadata = metadata_from_json(os.path.join('test', 'metadata.json'))
+    configuration = Configuration(
+        file_path=os.path.join('test', 'orders.csv')
+    )
+    extractor = DataExtractor(
+        dataset_specification=dataset,
+        metadata=metadata,
+        configuration=configuration
+    )
+    extractor.validate_data()
+    assert extractor.get_total() == 2326534.3543
+
+
+def test_csv_total_profit():
+    dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
+    dataset.measures = ['Profit']
+    metadata = metadata_from_json(os.path.join('test', 'metadata.json'))
+    configuration = Configuration(
+        file_path=os.path.join('test', 'orders.csv')
+    )
+    extractor = DataExtractor(
+        dataset_specification=dataset,
+        metadata=metadata,
+        configuration=configuration
+    )
+    extractor.validate_data()
+    assert round(extractor.get_total(), 4) == 292296.8146
+
+
+def test_stream_sql_subset_to_csv_with_total():
+    # Skip this test if we don't have a connection string
+    if not os.environ.get('CONNECTION_STRING'):
+        pytest.skip("Skipping SQL test as no database configured")
+
+    dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
+    dataset.measures = ['Sales']
+    dataset.dimensions = ['Product Name']
+    metadata = metadata_from_json(os.path.join('test', 'metadata.json'))
+    configuration = Configuration(
+        connection_string=os.environ.get('CONNECTION_STRING'),
+        schema="dev",
+        view="superstore",
+        query_builder=SubsetQueryBuilder
+    )
+    extractor = StreamingDataExtractor(
+        dataset_specification=dataset,
+        metadata=metadata,
+        configuration=configuration
+    )
+    file = tempfile.NamedTemporaryFile(suffix='.csv')
+    extractor.stream_sql_to_csv(file_path=file.name, chunk_size=1000)
+    total = extractor.get_total()
+    df = pd.read_csv(file)
+    assert len(df) == 1849
+    assert round(total, 2) == 2326534.35
+
+
+def test_stream_sql_view_to_csv_with_total():
+    # Skip this test if we don't have a connection string
+    if not os.environ.get('CONNECTION_STRING'):
+        pytest.skip("Skipping SQL test as no database configured")
+
+    dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
+    dataset.measures = ['Sales']
+    dataset.dimensions = ['Product Name']
+    metadata = metadata_from_json(os.path.join('test', 'metadata.json'))
+    configuration = Configuration(
+        connection_string=os.environ.get('CONNECTION_STRING'),
+        schema="dev",
+        view="superstore",
+        query_builder=ViewBasedQueryBuilder
+    )
+    extractor = StreamingDataExtractor(
+        dataset_specification=dataset,
+        metadata=metadata,
+        configuration=configuration
+    )
+    file = tempfile.NamedTemporaryFile(suffix='.csv')
+    extractor.stream_sql_to_csv(file_path=file.name, chunk_size=1000)
+    total = extractor.get_total()
+    df = pd.read_csv(file)
+    assert len(df) == 10194
+    assert round(total, 2) == 2326534.35

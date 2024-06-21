@@ -26,6 +26,9 @@ class QueryBuilder:
     def create_query(self) -> [str, List[any]]:
         raise NotImplementedError
 
+    def create_totals_query(self) -> [str, List[any]]:
+        raise NotImplementedError
+
 
 class ViewBasedQueryBuilder(QueryBuilder):
     """
@@ -40,6 +43,11 @@ class ViewBasedQueryBuilder(QueryBuilder):
             dataset_specification=dataset_specification,
             metadata=metadata
         )
+
+    def create_totals_query(self) -> [str, List[any]]:
+        _sql = f'SELECT SUM("'+self.dataset_specification.measures[0]+'") FROM "' + self.configuration.schema + '"."' + self.configuration.view + '"'
+        _params = []
+        return [_sql, _params]
 
     def create_query(self) -> [str, List[any]]:
         _sql = 'SELECT * FROM "' + self.configuration.schema + '"."' + self.configuration.view + '"'
@@ -62,7 +70,6 @@ class SubsetQueryBuilder(QueryBuilder):
         )
         self.table = Table(self.configuration.view, schema=self.configuration.schema)
         self.years = self.dataset_specification.get_property('years')
-        self.parameters = {}
         self.onward_use_category = self.dataset_specification.get_property('onwardUseCategory')
         logger.debug("Query builder using table " + str(self.table))
 
@@ -73,6 +80,24 @@ class SubsetQueryBuilder(QueryBuilder):
                 if 'subject' in meta.get_property('groups'):
                     return True
         return False
+
+    def create_totals_query(self) -> [str, List[any]]:
+        """
+        Constructs a 'total only' query by combining the selections and constraints.
+        :return: an array containing the query prepared statement, and the parameters
+        """
+        measures = []
+        for measure in self.dataset_specification.measures:
+            # Decide column name based on whether 'subject' fields are present
+            if measure in ['FPE', 'FTE'] and not self.contains_subject():
+                measures.append(fn.Sum(self.table[measure], 'Count'))
+            else:
+                measures.append(fn.Sum(self.table[measure], measure))
+
+        q = Query().from_(self.table).select(*measures)
+
+        q, parameters = self.create_constraints(q)
+        return [q.get_sql(), parameters]
 
     def create_query(self) -> [str, List[any]]:
         """
@@ -106,8 +131,8 @@ class SubsetQueryBuilder(QueryBuilder):
             select(*select_fields). \
             groupby(*group_fields)
 
-        q = self.create_constraints(q)
-        return [q.get_sql(), self.parameters]
+        q, parameters = self.create_constraints(q)
+        return [q.get_sql(), parameters]
 
     def create_constraints(self, q):
         """
@@ -118,6 +143,7 @@ class SubsetQueryBuilder(QueryBuilder):
         :return: the Query object with constraints
         """
         clauses = []
+        parameters = {}
         for constraint in self.dataset_specification.constraints:
             column = constraint.item
             placeholders = []
@@ -127,10 +153,8 @@ class SubsetQueryBuilder(QueryBuilder):
                 # TODO Probably need some way of identifying which parameter style to apply.
                 parameter = Parameter('%('+parameter_name+')s')
                 placeholders.append(parameter)
-                self.parameters[parameter_name] = constraint.allowed_values[i]
+                parameters[parameter_name] = constraint.allowed_values[i]
             clauses.append(self.table[column].isin(placeholders))
 
         q = q.where(Criterion.all(clauses))
-        return q
-
-
+        return q, parameters
