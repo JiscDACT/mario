@@ -1,5 +1,6 @@
 import logging
 import shutil
+import tempfile
 
 import pandas as pd
 from pandas import DataFrame
@@ -323,6 +324,23 @@ class StreamingDataExtractor(DataExtractor):
         super().__init__(configuration, dataset_specification, metadata)
         self._data = None
 
+    def get_data_frame(self, minimise=True) -> DataFrame:
+        if self._data is None:
+            raise NotImplementedError("Dataframe is not available when using a streaming extractor")
+        else:
+            return super().get_data_frame(minimise=minimise)
+
+    def validate_data(self, allow_nulls=True):
+        if self._data is None:
+            logger.warning("Calling validate_data() on a streaming extractor causes the data"
+                           "to be re-streamed from source into a temporary file. If this is "
+                           "not what you had in mind, first stream the data to file, and "
+                           "then load the file in a DataExtractor")
+            with tempfile.TemporaryFile() as file:
+                self.stream_sql_to_hyper(file_path=file.name, validate=True, allow_nulls=allow_nulls)
+        else:
+            super().validate_data(allow_nulls=allow_nulls)
+
     def get_connection(self):
         from sqlalchemy import create_engine
         engine = create_engine(self.configuration.connection_string)
@@ -369,6 +387,7 @@ class StreamingDataExtractor(DataExtractor):
                             schema: str = 'Extract',
                             validate: bool = False,
                             allow_nulls: bool = False,
+                            minimise: bool = False,
                             chunk_size: int = 100000):
         """
         Write From SQL to .hyper using streaming. No data is held in memory
@@ -383,9 +402,13 @@ class StreamingDataExtractor(DataExtractor):
         connection = self.get_connection()
         table_name = TableName(schema, table)
         for df in pd.read_sql(self._query[0], connection, chunksize=chunk_size):
-            if validate:
+            if validate or minimise:
                 self._data = df
-                self.validate_data(allow_nulls=allow_nulls)
+                if validate:
+                    self.validate_data(allow_nulls=allow_nulls)
+                if minimise:
+                    self.__minimise_data__()
+                    df = self._data
             frame_to_hyper(df, database=file_path, table=table_name, table_mode='a')
 
     def stream_sql_to_csv(self,
@@ -394,7 +417,7 @@ class StreamingDataExtractor(DataExtractor):
                           allow_nulls: bool = False,
                           chunk_size: int = 100000,
                           compress_using_gzip: bool = False,
-                          minimise = False
+                          minimise: bool = False
                           ):
         """
         Write From SQL to CSV using streaming. No data is held in memory
@@ -414,11 +437,13 @@ class StreamingDataExtractor(DataExtractor):
         mode = 'w'
         header = True
         for df in pd.read_sql(self._query[0], connection, chunksize=chunk_size):
-            if validate:
+            if validate or minimise:
                 self._data = df
-                self.validate_data(allow_nulls=allow_nulls)
-            if minimise:
-                self.__minimise_data__()
+                if validate:
+                    self.validate_data(allow_nulls=allow_nulls)
+                if minimise:
+                    self.__minimise_data__()
+                    df = self._data
             df.to_csv(file_path, mode=mode, header=header, index=False, compression=compression_options)
             if header:
                 header = False

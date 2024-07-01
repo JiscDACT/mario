@@ -187,6 +187,32 @@ def test_stream_sql_to_csv_with_validation():
         extractor.stream_sql_to_csv(file_path=file.name, validate=True, chunk_size=1000)
 
 
+def test_stream_sql_to_csv_with_minimisation():
+    # Skip this test if we don't have a connection string
+    if not os.environ.get('CONNECTION_STRING'):
+        pytest.skip("Skipping SQL test as no database configured")
+
+    dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
+    metadata = metadata_from_json(os.path.join('test', 'metadata.json'))
+    # Remove ship mode
+    dataset.dimensions.remove('Ship Mode')
+    configuration = Configuration(
+        connection_string=os.environ.get('CONNECTION_STRING'),
+        schema="dev",
+        view="superstore",
+        query_builder=ViewBasedQueryBuilder
+    )
+    extractor = StreamingDataExtractor(
+        dataset_specification=dataset,
+        metadata=metadata,
+        configuration=configuration
+    )
+    file = tempfile.NamedTemporaryFile(suffix='.csv')
+    extractor.stream_sql_to_csv(file_path=file.name, validate=False, minimise=True, chunk_size=1000)
+    df = pd.read_csv(file.name)
+    assert 'Ship Mode' not in df.columns
+
+
 def test_column_mapping():
     # Skip this test if we don't have a connection string
     if not os.environ.get('CONNECTION_STRING'):
@@ -358,3 +384,27 @@ def test_stream_sql_view_to_csv_with_total():
     df = pd.read_csv(file)
     assert len(df) == 10194
     assert round(total, 2) == 2326534.35
+
+
+def test_validate_data_on_streaming_extractor():
+    # Skip this test if we don't have a connection string
+    if not os.environ.get('CONNECTION_STRING'):
+        pytest.skip("Skipping SQL test as no database configured")
+
+    dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
+    metadata = metadata_from_json(os.path.join('test', 'metadata.json'))
+    # Restrict ship modes so that validation fails
+    metadata.get_metadata('Ship Mode').set_property('domain', ["First Class", "Second Class"])
+    configuration = Configuration(
+        connection_string=os.environ.get('CONNECTION_STRING'),
+        schema="dev",
+        view="superstore",
+        query_builder=ViewBasedQueryBuilder
+    )
+    extractor = StreamingDataExtractor(
+        dataset_specification=dataset,
+        metadata=metadata,
+        configuration=configuration
+    )
+    with pytest.raises(ValueError):
+        extractor.validate_data()
