@@ -1,12 +1,13 @@
 import os
 
+import pandas as pd
 import pytest
 
-from mario.data_extractor import Configuration, HyperFile, DataExtractor
+from mario.data_extractor import Configuration, HyperFile, DataExtractor, StreamingDataExtractor
 from mario.dataset_builder import DatasetBuilder, Format
 from mario.dataset_specification import dataset_from_json, Constraint, dataset_from_manifest
 from mario.metadata import metadata_from_json, metadata_from_manifest
-from mario.query_builder import SubsetQueryBuilder
+from mario.query_builder import SubsetQueryBuilder, ViewBasedQueryBuilder
 
 
 def test_integration_tdsx():
@@ -131,4 +132,54 @@ def test_integration_excel_info_only_with_totals():
     workbook: Workbook = load_workbook(path)
     total_from_notes = workbook.get_sheet_by_name('Notes')['B15'].value
     assert total_from_notes == total_from_query
+
+
+def test_integration_csv_streaming():
+    # Skip this test if we don't have a connection string
+    if not os.environ.get('CONNECTION_STRING'):
+        pytest.skip("Skipping SQL test as no database configured")
+    dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
+    dataset.collection = 'test_integration_csv_streaming'
+    metadata = metadata_from_json(os.path.join('test', 'metadata.json'))
+    configuration = Configuration(
+        connection_string=os.environ.get('CONNECTION_STRING'),
+        schema="dev",
+        view="superstore",
+        query_builder=ViewBasedQueryBuilder
+    )
+    extractor = StreamingDataExtractor(
+        dataset_specification=dataset,
+        metadata=metadata,
+        configuration=configuration
+    )
+    builder = DatasetBuilder(dataset_specification=dataset, metadata=metadata, data=extractor)
+    path = os.path.join('output', dataset.collection, dataset.name + '.csv')
+    os.makedirs(os.path.join('output', dataset.collection), exist_ok=True)
+    builder.build(file_path=path, output_format=Format.CSV)
+    df = pd.read_csv(path)
+    assert len(df) == 10194
+
+
+def test_integration_tdsx_streaming():
+    # Skip this test if we don't have a connection string
+    if not os.environ.get('CONNECTION_STRING'):
+        pytest.skip("Skipping SQL test as no database configured")
+    dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
+    dataset.collection = 'test_integration_tdsx_streaming'
+    metadata = metadata_from_json(os.path.join('test', 'metadata.json'))
+    configuration = Configuration(
+        connection_string=os.environ.get('CONNECTION_STRING'),
+        schema="dev",
+        view="superstore",
+        query_builder=ViewBasedQueryBuilder
+    )
+    extractor = StreamingDataExtractor(
+        dataset_specification=dataset,
+        metadata=metadata,
+        configuration=configuration
+    )
+    builder = DatasetBuilder(dataset_specification=dataset, metadata=metadata, data=extractor)
+    path = os.path.join('output', dataset.collection, dataset.name + '.tdsx')
+    os.makedirs(os.path.join('output', dataset.collection), exist_ok=True)
+    builder.build(file_path=path, output_format=Format.TABLEAU_PACKAGED_DATASOURCE)
 

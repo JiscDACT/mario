@@ -329,6 +329,20 @@ class StreamingDataExtractor(DataExtractor):
         connection = engine.connect().execution_options(stream_results=True)
         return connection
 
+    def save_data_as_csv(self, file_path: str, minimise=False):
+        if minimise:
+            raise NotImplementedError('Cannot minimise data when using streaming')
+        self.stream_sql_to_csv(file_path=file_path)
+
+    def save_data_as_hyper(self, file_path: str, table: str = 'Extract', schema: str = 'Extract', minimise=False):
+        if minimise:
+            raise NotImplementedError('Cannot minimise data when using streaming')
+        self.stream_sql_to_hyper(
+            file_path=file_path,
+            table=table,
+            schema=schema
+        )
+
     def get_total(self):
         """
         For totals when streaming data we need to run a totals SQL query separate
@@ -379,7 +393,8 @@ class StreamingDataExtractor(DataExtractor):
                           validate: bool = False,
                           allow_nulls: bool = False,
                           chunk_size: int = 100000,
-                          compress_using_gzip: bool = False
+                          compress_using_gzip: bool = False,
+                          minimise = False
                           ):
         """
         Write From SQL to CSV using streaming. No data is held in memory
@@ -402,6 +417,8 @@ class StreamingDataExtractor(DataExtractor):
             if validate:
                 self._data = df
                 self.validate_data(allow_nulls=allow_nulls)
+            if minimise:
+                self.__minimise_data__()
             df.to_csv(file_path, mode=mode, header=header, index=False, compression=compression_options)
             if header:
                 header = False
