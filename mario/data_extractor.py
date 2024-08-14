@@ -121,9 +121,21 @@ class DataExtractor:
                 columns_to_keep.append(self.__get_column_name__(item))
         self._data = self._data[columns_to_keep]
 
-    def get_total(self):
+    def __get_measure__(self, measure=None):
+        if measure is None:
+            if len(self.dataset_specification.measures) > 0:
+                measure = self.dataset_specification.measures[0]
+        else:
+            if measure not in self.dataset_specification.measures:
+                raise ValueError(f"Measure {measure} does not exist in dataset specification")
+        return measure
+
+    def get_total(self, measure=None):
         df = self.get_data_frame()
-        self._total = df[self.dataset_specification.measures[0]].sum()
+        measure = self.__get_measure__(measure)
+        if measure is None:
+            return len(df)
+        self._total = df[measure].sum()
         return self._total
 
     def validate_data(self, allow_nulls=True):
@@ -361,20 +373,21 @@ class StreamingDataExtractor(DataExtractor):
             schema=schema
         )
 
-    def get_total(self):
+    def get_total(self, measure=None):
         """
         For totals when streaming data we need to run a totals SQL query separate
         from the main query and use the results of this
         :return: the total value of the query
         """
         logger.info("Building totals query")
+        measure = self.__get_measure__(measure)
         if self.configuration.query_builder is not None:
             from mario.query_builder import QueryBuilder
             query_builder: QueryBuilder = self.configuration.query_builder(
                 configuration=self.configuration,
                 metadata=self.metadata,
                 dataset_specification=self.dataset_specification)
-            totals_query = query_builder.create_totals_query()
+            totals_query = query_builder.create_totals_query(measure=measure)
         else:
             raise NotImplementedError
 
@@ -513,3 +526,17 @@ class StreamingDataExtractor(DataExtractor):
 
         # Close connection when done
         connection.close()
+
+
+class DataFrameExtractor(DataExtractor):
+    """
+    Wrapper for a DataExtractor using an existing DataFrame
+    """
+
+    def __init__(self,
+                 dataset_specification: DatasetSpecification,
+                 metadata: Metadata,
+                 dataframe: DataFrame
+                 ):
+        super().__init__(configuration=Configuration(), dataset_specification=dataset_specification, metadata=metadata)
+        self._data = dataframe

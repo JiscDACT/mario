@@ -26,7 +26,7 @@ class QueryBuilder:
     def create_query(self) -> [str, List[any]]:
         raise NotImplementedError
 
-    def create_totals_query(self) -> [str, List[any]]:
+    def create_totals_query(self, measure=None) -> [str, List[any]]:
         raise NotImplementedError
 
 
@@ -44,8 +44,12 @@ class ViewBasedQueryBuilder(QueryBuilder):
             metadata=metadata
         )
 
-    def create_totals_query(self) -> [str, List[any]]:
-        _sql = f'SELECT SUM("'+self.dataset_specification.measures[0]+'") FROM "' + self.configuration.schema + '"."' + self.configuration.view + '"'
+    def create_totals_query(self, measure=None) -> [str, List[any]]:
+        if measure is None:
+            _sql = f'SELECT COUNT(*) FROM "' + self.configuration.schema + '"."' + self.configuration.view + '"'
+        else:
+            _sql = f'SELECT SUM("'+measure+'") FROM "' + self.configuration.schema + '"."' + self.configuration.view + '"'
+
         _params = []
         return [_sql, _params]
 
@@ -81,18 +85,22 @@ class SubsetQueryBuilder(QueryBuilder):
                     return True
         return False
 
-    def create_totals_query(self) -> [str, List[any]]:
+    def create_totals_query(self, measure=None) -> [str, List[any]]:
         """
         Constructs a 'total only' query by combining the selections and constraints.
         :return: an array containing the query prepared statement, and the parameters
+        TODO make this more generic
         """
         measures = []
-        for measure in self.dataset_specification.measures:
-            # Decide column name based on whether 'subject' fields are present
-            if measure in ['FPE', 'FTE'] and not self.contains_subject():
-                measures.append(fn.Sum(self.table[measure], 'Count'))
-            else:
-                measures.append(fn.Sum(self.table[measure], measure))
+        if measure is None:
+            for measure in self.dataset_specification.measures:
+                # Decide column name based on whether 'subject' fields are present
+                if measure in ['FPE', 'FTE'] and not self.contains_subject():
+                    measures.append(fn.Sum(self.table[measure], 'Count'))
+                else:
+                    measures.append(fn.Sum(self.table[measure], measure))
+        else:
+            measures.append(fn.Sum(self.table[measure], measure))
 
         q = Query().from_(self.table).select(*measures)
 
