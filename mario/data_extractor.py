@@ -110,6 +110,8 @@ class DataExtractor:
         meta = self.metadata.get_metadata(item)
         if meta.get_property('output_name') is not None:
             return meta.get_property('output_name')
+        elif meta.get_property('physical_column_name') is not None:
+            return meta.get_property('physical_column_name')
         else:
             return meta.name
 
@@ -139,54 +141,13 @@ class DataExtractor:
         return self._total
 
     def validate_data(self, allow_nulls=True):
-        data = self.get_data_frame()
-        validation_errors = []
-
-        # Check for NULLs
-        if allow_nulls is not True:
-            if len(data.loc[data.isna().any(axis=1)]) > 0:
-                validation_errors.append("Dataset contains NULLs")
-                logger.warning("Dataset contains NULLs")
-
-        for item in self.dataset_specification.items:
-            metadata = self.metadata.get_metadata(item)
-            column = self.__get_column_name__(item)
-            # Ignore calculated fields
-            if metadata.get_property('formula') is None:
-                # Check all columns present
-                if column not in data.columns:
-                    validation_errors.append("Item missing: " + item)
-                else:
-                    # Check domain
-                    if metadata.get_property('domain') is not None:
-                        data_domain = data[column].unique()
-                        metadata_domain = metadata.get_property('domain')
-                        for element in data_domain:
-                            if element not in metadata_domain:
-                                validation_errors.append("Domain validation failed for " + item)
-                                logger.error("Validation error: '" + str(element) + "' is not in domain of " + item)
-                        for metadata_element in metadata_domain:
-                            if metadata_element not in data_domain:
-                                logger.warning(f"Warning: {str(metadata_element)} is not present in the data for {item}")
-
-                    # Check range
-                    if metadata.get_property('range') is not None:
-                        min_value = metadata.get_property('range')[0]
-                        max_value = metadata.get_property('range')[1]
-                        data_min = data[column].min()
-                        data_max = data[column].max()
-                        if data_min < min_value:
-                            validation_errors.append("Range validation failed for " + item)
-                            logger.error("Validation error: '" + str(data_min) + "' is less than " + str(min_value))
-                        if data_max > max_value:
-                            validation_errors.append("Range validation failed for " + item)
-                            logger.error("Validation error: '" + str(data_max) + "' is greater than " + str(max_value))
-
-        if len(validation_errors) != 0:
-            for validation_error in validation_errors:
-                logger.error(validation_error)
-            raise ValueError("Data validation failed - check the logs for details")
-        return True
+        from mario.validation import DataFrameValidator
+        validator = DataFrameValidator(
+            self.dataset_specification,
+            self.metadata,
+            data=self.get_data_frame()
+        )
+        return validator.validate_data(allow_nulls)
 
     def get_data_frame(self, minimise=True) -> DataFrame:
         if self._data is None:
@@ -236,74 +197,14 @@ class HyperFile(DataExtractor):
         super().__init__(Configuration(), dataset_specification, metadata)
         self.configuration = configuration
 
-    def check_type(self, column_name: str, expected_type: str, table_name: str, schema_name: str):
-        from tableau_builder.hyper_utils import get_table
-        table = get_table(hyper_path=self.configuration.file_path, table_name=table_name, schema_name=schema_name)
-        column = table.get_column_by_name(column_name)
-        if expected_type is None:
-            expected_type = 'text'
-        if str(column.type).lower() == expected_type.lower():
-            return True
-        elif str(column.type).lower() == 'big_int' and expected_type.lower() == 'int':
-            logger.warning(f"Validation warning: {column_name} is big_int rather than int")
-            return True
-        else:
-            logger.error("Validation error: '" + str(
-                column.type).lower() + "' is not the expected type (" + expected_type + ") for " + column_name)
-            return False
-
     def validate_data(self, allow_nulls=False):
-        from tableau_builder.hyper_utils import get_default_table_and_schema, check_column_exists, \
-            check_domain, check_range
-
-        validation_errors = []
-
-        table_schema = get_default_table_and_schema(self.configuration.file_path)
-        table = table_schema['table']
-        schema = table_schema['schema']
-
-        for item in self.dataset_specification.items:
-            metadata = self.metadata.get_metadata(item)
-            if metadata.get_property('formula') is None:
-                if not check_column_exists(
-                        hyper_path=self.configuration.file_path,
-                        column_name=item,
-                        table_name=table,
-                        schema_name=schema
-                ):
-                    validation_errors.append("Item missing: " + item)
-                else:
-                    if metadata.get_property('datatype') and not self.check_type(
-                            column_name=item,
-                            expected_type=metadata.get_property('datatype'),
-                            table_name=table,
-                            schema_name=schema
-                    ):
-                        validation_errors.append("Item is wrong type: " + item)
-                    if metadata.get_property('domain') is not None:
-                        if not check_domain(
-                                hyper_path=self.configuration.file_path,
-                                field=item,
-                                domain=metadata.get_property('domain'),
-                                table_name=table,
-                                schema_name=schema
-                        ):
-                            validation_errors.append("Domain validation failed for " + item)
-                    if metadata.get_property('range') is not None:
-                        if not check_range(
-                                hyper_path=self.configuration.file_path,
-                                field=item,
-                                min_value=metadata.get_property('range')[0],
-                                max_value=metadata.get_property('range')[1],
-                                table_name=table,
-                                schema_name=schema
-                        ):
-                            validation_errors.append("Range validation failed for " + item)
-        if len(validation_errors) != 0:
-            for validation_error in validation_errors:
-                logger.error(validation_error)
-            raise ValueError("Domain validation failed - check the logs for details")
-        return True
+        from validation import HyperValidator
+        validator = HyperValidator(
+            dataset_specification=self.dataset_specification,
+            metadata=self.metadata,
+            hyper_file_path=self.configuration.file_path
+        )
+        return validator.validate_data(allow_nulls)
 
     def __minimise_data__(self):
         from tableau_builder import hyper_utils
