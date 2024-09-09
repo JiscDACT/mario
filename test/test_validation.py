@@ -5,7 +5,7 @@ import pytest
 from mario.data_extractor import DataExtractor, Configuration
 from mario.dataset_specification import dataset_from_json
 from mario.metadata import metadata_from_json, Item
-from mario.validation import DataFrameValidator, HyperValidator
+from mario.validation import DataFrameValidator, HyperValidator, Validator
 
 
 def test_no_nulls():
@@ -46,7 +46,7 @@ def test_nulls():
     dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
     # postal code has NULLs
     metadata = metadata_from_json(os.path.join('test', 'metadata.json'))
-    hyper_path = os.path.join('test', 'orders.hyper')
+    hyper_path = os.path.join('test', 'orders_with_nulls.hyper')
     configuration = Configuration(
         file_path=hyper_path
     )
@@ -74,7 +74,7 @@ def test_nulls():
 def test_nulls_hyper():
     dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
     metadata = metadata_from_json(os.path.join('test', 'metadata.json'))
-    hyper_path = os.path.join('test', 'orders.hyper')
+    hyper_path = os.path.join('test', 'orders_with_nulls.hyper')
 
     validator = HyperValidator(
         dataset_specification=dataset,
@@ -244,7 +244,7 @@ def test_multiple_errors_hyper():
     item.set_property('range', [0.0, 0.2])
     item = metadata.get_metadata('Ship Mode')
     item.set_property('domain', ["First Class", "Second Class", "Standard Class"])
-    hyper_path = os.path.join('test', 'orders.hyper')
+    hyper_path = os.path.join('test', 'orders_with_nulls.hyper')
 
     validator = HyperValidator(
         dataset_specification=dataset,
@@ -312,4 +312,88 @@ def test_pattern_validation_fails():
         validator.validate_data(allow_nulls=True)
     assert len(validator.errors) == 102
     assert "Validation error: 'Order Identifier': 'CA-2019-115238' does not match the pattern 'US-20\\d\\d-\\d{6}'" in validator.errors
+
+
+def test_get_hierarchies():
+    dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
+    metadata = metadata_from_json(os.path.join('test', 'metadata.json'))
+    validator = Validator(dataset_specification=dataset, metadata=metadata)
+    hierarchies = validator.__get_hierarches__()
+    assert len(hierarchies) == 2
+    assert 'Product' in hierarchies
+    assert 'Location' in hierarchies
+
+
+def test_get_hierarchy():
+    dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
+    metadata = metadata_from_json(os.path.join('test', 'metadata.json'))
+    validator = Validator(dataset_specification=dataset, metadata=metadata)
+    products = validator.__get_hierarchy__('Product')
+    assert products == ['Category', 'Product Name']
+
+
+def test_get_hierarchy_data():
+    dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
+    metadata = metadata_from_json(os.path.join('test', 'metadata.json'))
+    file_path = os.path.join('test', 'orders.csv')
+
+    configuration = Configuration(
+        file_path=file_path
+    )
+    extractor = DataExtractor(
+        dataset_specification=dataset,
+        metadata=metadata,
+        configuration=configuration
+    )
+
+    validator = DataFrameValidator(
+        dataset_specification=dataset,
+        metadata=metadata,
+        data=extractor.get_data_frame(minimise=False)
+    )
+
+    dimensions = validator.__get_data_for_hierarchy__('Product')
+    assert len(dimensions) == 1849
+    assert len(dimensions.columns) == 2
+
+
+def test_check_hierarchies():
+    dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
+    metadata = metadata_from_json(os.path.join('test', 'metadata.json'))
+    file_path = os.path.join('test', 'orders.csv')
+
+    configuration = Configuration(
+        file_path=file_path
+    )
+    extractor = DataExtractor(
+        dataset_specification=dataset,
+        metadata=metadata,
+        configuration=configuration
+    )
+
+    validator = DataFrameValidator(
+        dataset_specification=dataset,
+        metadata=metadata,
+        data=extractor.get_data_frame(minimise=False)
+    )
+    validator.check_hierarchies()
+
+    assert validator.errors == ["Inconsistent hierarchy: 92024 at level Postal Code is represented in multiple higher level categories ('United States', 'West', 'California', 'Encinitas') and ('United States', 'West', 'California', 'San Diego')."]
+
+
+def test_check_hierarchies_hyper():
+    dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
+    metadata = metadata_from_json(os.path.join('test', 'metadata.json'))
+    file_path = os.path.join('test', 'orders.hyper')
+
+    validator = HyperValidator(
+        dataset_specification=dataset,
+        metadata=metadata,
+        hyper_file_path=file_path
+    )
+    validator.check_hierarchies()
+
+    assert validator.errors == ["Inconsistent hierarchy: 92024 at level Postal Code is represented in multiple higher level categories ('United States', 'West', 'California', 'Encinitas') and ('United States', 'West', 'California', 'San Diego')."]
+
+
 

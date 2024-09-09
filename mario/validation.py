@@ -56,6 +56,58 @@ class Validator:
     def __contains_nulls__(self, item: Item):
         return None in self.__get_column_values__(item)
 
+    def __get_hierarches__(self):
+        hierarchies = set()
+        for item in self.metadata.items:
+            if item.get_property('hierarchies') is not None:
+                for hierarchy in item.get_property('hierarchies'):
+                    hierarchies.add(hierarchy['hierarchy'])
+        return list(hierarchies)
+
+    def __get_hierarchy__(self, name):
+        items = []
+        for item in self.metadata.items:
+            if item.get_property('hierarchies') is not None:
+                for hierarchy in item.get_property('hierarchies'):
+                    if hierarchy['hierarchy'] == name:
+                        items.append({'name': item.name, 'level': hierarchy['level']})
+
+        # Sort the list of dictionaries by 'level'
+        sorted_items = sorted(items, key=lambda x: x['level'])
+        # Extract the 'name' values in order
+        item_names_in_order = [item['name'] for item in sorted_items]
+        return item_names_in_order
+
+    def __get_data_for_hierarchy__(self, name):
+        raise NotImplementedError()
+
+    def __check_hierarchy__(self, name):
+        # Create a dictionary to store the hierarchy
+        hierarchy = {}
+
+        # Get the levels
+        levels = self.__get_hierarchy__(name)
+
+        # Get the data
+        df = self.__get_data_for_hierarchy__(name)
+
+        # Group by all levels except the last one
+        grouped = df.groupby(levels[:-1])[levels[-1]].apply(list).reset_index()
+
+        # Check for duplicates at the last level
+        for _, row in grouped.iterrows():
+            higher_levels = tuple(row[levels[:-1]])
+            values = row[levels[-1]]
+            for value in values:
+                if value not in hierarchy:
+                    hierarchy[value] = higher_levels
+                elif hierarchy[value] != higher_levels:
+                    self.errors.append(f"Inconsistent hierarchy: {value} at level {levels[-1]} is represented in multiple higher level categories {hierarchy[value]} and {higher_levels}.")
+
+    def check_hierarchies(self):
+        for hierarchy in self.__get_hierarches__():
+            self.__check_hierarchy__(hierarchy)
+
     def check_data_type(self, item: Item):
         expected_data_type = item.get_property('datatype')
         if expected_data_type is None:
@@ -187,6 +239,10 @@ class DataFrameValidator(Validator):
         data_max = self.data[column].max()
         return data_min, data_max
 
+    def __get_data_for_hierarchy__(self, name):
+        fields = self.__get_hierarchy__(name)
+        return self.data[fields].drop_duplicates().reset_index(drop=True)
+
     def check_column_present(self, item: Item):
         if item.get_property('formula') is None:
             column = self.__get_column_name__(item)
@@ -214,6 +270,21 @@ class HyperValidator(Validator):
         table_schema = get_default_table_and_schema(self.hyper_file_path)
         self.table = table_schema['table']
         self.schema = table_schema['schema']
+
+    def __get_data_for_hierarchy__(self, name):
+        from pantab import frame_from_hyper_query
+        fields = ', '.join(f'"{s}"' for s in self.__get_hierarchy__(name))
+        query = f"""
+                     SELECT
+                         {fields} 
+                     FROM "{self.schema}"."{self.table}" 
+                     GROUP BY {fields} 
+        """
+        from tableauhyperapi import HyperProcess, Telemetry, Connection
+        with HyperProcess(Telemetry.DO_NOT_SEND_USAGE_DATA_TO_TABLEAU, 'test') as hyper:
+            with Connection(hyper.endpoint, self.hyper_file_path) as connection:
+                results_df = frame_from_hyper_query(connection,query)
+        return results_df
 
     def check_column_present(self, item: Item):
         column = self.__get_column_name__(item)
