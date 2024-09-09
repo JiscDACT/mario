@@ -49,11 +49,11 @@ def test_csv_to_hyper():
         extractor.save_data_as_hyper(file_path=file.name)
 
 
-def test_hyper_to_csv():
+def test_hyper_with_nulls_to_csv():
     dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
     metadata = metadata_from_json(os.path.join('test', 'metadata.json'))
     configuration = Configuration(
-        file_path=os.path.join('test', 'orders.hyper')
+        file_path=os.path.join('test', 'orders_with_nulls.hyper')
     )
     extractor = DataExtractor(
         dataset_specification=dataset,
@@ -67,10 +67,8 @@ def test_hyper_to_csv():
         extractor.save_data_as_csv(file_path=file.name)
 
 
-def test_hyper_to_csv_without_nulls():
+def test_hyper_without_nulls_to_csv():
     dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
-    # postal code has NULLs
-    dataset.dimensions.remove('Postal Code')
     metadata = metadata_from_json(os.path.join('test', 'metadata.json'))
     configuration = Configuration(
         file_path=os.path.join('test', 'orders.hyper')
