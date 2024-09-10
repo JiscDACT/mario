@@ -81,6 +81,9 @@ class Validator:
     def __get_data_for_hierarchy__(self, name):
         raise NotImplementedError()
 
+    def __get_column_with_segmentation__(self, item:Item, segmentation: str):
+        raise NotImplementedError()
+
     def __check_hierarchy__(self, name):
         # Create a dictionary to store the hierarchy
         hierarchy = {}
@@ -104,9 +107,40 @@ class Validator:
                 elif hierarchy[value] != higher_levels:
                     self.errors.append(f"Inconsistent hierarchy: {value} at level {levels[-1]} is represented in multiple higher level categories {hierarchy[value]} and {higher_levels}.")
 
+    def __check_for_anomalies__(self, series, threshold=1.75):
+        """
+        Checks a series for anomalies by looking for absolute z-scores above threshold
+        :param series: the series to check
+        :param threshold:  the threshold level
+        :return: True if an anomaly is present
+        """
+        import numpy as np
+        mean = series.mean()
+        std = series.std()
+        z_scores = (series - mean) / std
+        return np.any(np.abs(z_scores) > threshold)
+
     def check_hierarchies(self):
+        """
+        Checks the validity of hierarchies, i.e. that they form a tree structure and
+        adds any anomalies found to errors/warnings
+        """
         for hierarchy in self.__get_hierarches__():
             self.__check_hierarchy__(hierarchy)
+
+    def check_category_anomalies(self, segmentation: str):
+        """
+        Checks to see if we get anomalies in how categories are split e.g. over time
+        and adds them to warnings
+        :param item: the item to check
+        :param segmentation: the field to segment by
+        :return: None
+        """
+        for dimension in self.dataset_specification.dimensions:
+            item = self.metadata.get_metadata(dimension)
+            subset = self.__get_column_with_segmentation__(item, segmentation)
+            if self.__check_for_anomalies__(subset):
+                self.warnings.append(f"Validation warning: '{item.name}' has potentially anomalous data when segmented by '{segmentation}'")
 
     def check_data_type(self, item: Item):
         expected_data_type = item.get_property('datatype')
@@ -252,6 +286,10 @@ class DataFrameValidator(Validator):
             return True
         return False
 
+    def __get_column_with_segmentation__(self, item:Item, segmentation: str):
+        column = self.__get_column_name__(item)
+        return self.data.groupby(segmentation)[column].nunique()
+
 
 class HyperValidator(Validator):
     """
@@ -279,6 +317,20 @@ class HyperValidator(Validator):
                          {fields} 
                      FROM "{self.schema}"."{self.table}" 
                      GROUP BY {fields} 
+        """
+        from tableauhyperapi import HyperProcess, Telemetry, Connection
+        with HyperProcess(Telemetry.DO_NOT_SEND_USAGE_DATA_TO_TABLEAU, 'test') as hyper:
+            with Connection(hyper.endpoint, self.hyper_file_path) as connection:
+                results_df = frame_from_hyper_query(connection,query)
+        return results_df
+
+    def __get_column_with_segmentation__(self, item:Item, segmentation: str):
+        from pantab import frame_from_hyper_query
+        column = self.__get_column_name__(item)
+        query = f"""
+                    SELECT COUNT(DISTINCT "{column}")
+                    FROM "{self.schema}"."{self.table}" 
+                    GROUP BY "{segmentation}"
         """
         from tableauhyperapi import HyperProcess, Telemetry, Connection
         with HyperProcess(Telemetry.DO_NOT_SEND_USAGE_DATA_TO_TABLEAU, 'test') as hyper:
