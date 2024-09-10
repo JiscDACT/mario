@@ -132,7 +132,6 @@ class Validator:
         """
         Checks to see if we get anomalies in how categories are split e.g. over time
         and adds them to warnings
-        :param item: the item to check
         :param segmentation: the field to segment by
         :return: None
         """
@@ -213,7 +212,7 @@ class Validator:
                     if item.get_property('pattern') is None:
                         self.warnings.append(f"Validation warning: '{item.name}' has no quality rules.")
 
-    def validate_data(self, allow_nulls=True):
+    def validate_data(self, allow_nulls=True, check_hierarchies=False, detect_anomalies=False, segmentation=None):
         for item in self.dataset_specification.items:
             metadata = self.metadata.get_metadata(item)
             if self.check_column_present(metadata):
@@ -223,6 +222,13 @@ class Validator:
                 self.check_quality_checks(metadata)
                 self.check_data_type(metadata)
                 self.check_pattern_match(metadata)
+        if check_hierarchies:
+            self.check_hierarchies()
+        if detect_anomalies:
+            if segmentation is not None:
+                self.check_category_anomalies(segmentation)
+            else:
+                raise ValueError("A segmentation column, e.g. year, must be supplied to detect anomalies.")
 
         for warning in self.warnings:
             logger.warning(warning)

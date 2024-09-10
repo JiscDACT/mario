@@ -437,6 +437,31 @@ def test_category_anomalies_hyper():
 
     assert "Validation warning: 'Ship Mode' has potentially anomalous data when segmented by 'Year'" in validator.warnings
 
+def test_all_checks():
+    dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
+    metadata = metadata_from_json(os.path.join('test', 'metadata.json'))
+    file_path = os.path.join('test', 'orders.csv')
 
+    configuration = Configuration(
+        file_path=file_path
+    )
+    extractor = DataExtractor(
+        dataset_specification=dataset,
+        metadata=metadata,
+        configuration=configuration
+    )
 
+    # Introduce a segmentation variable
+    df = extractor.get_data_frame()
+    df['Year'] = df['Ship Date'].str[-4:]
+
+    validator = DataFrameValidator(
+        dataset_specification=dataset,
+        metadata=metadata,
+        data=extractor.get_data_frame(minimise=False)
+    )
+    with pytest.raises(ValueError):
+        validator.validate_data(check_hierarchies=True, detect_anomalies=True, segmentation='Year')
+    assert len(validator.errors) == 1
+    assert len(validator.warnings) == 11
 
