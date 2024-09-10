@@ -45,18 +45,23 @@ class Validator:
             return item.name
 
     def __get_column_data_type__(self, item: Item):
+        """ Returns the type of a metadata item from the data"""
         raise NotImplementedError()
 
     def __get_column_values__(self, item: Item):
+        """ Returns an array of the unique values in the data for an item """
         raise NotImplementedError()
 
     def __get_minimum_maximum_values__(self, item:Item):
+        """ Returns the minimum value of an item from the data """
         raise NotImplementedError()
 
     def __contains_nulls__(self, item: Item):
+        """ Returns True if the item has any Null values in the data """
         return None in self.__get_column_values__(item)
 
     def __get_hierarches__(self):
+        """ Returns a list of all hierarchies in the metadata """
         hierarchies = set()
         for item in self.metadata.items:
             if item.get_property('hierarchies') is not None:
@@ -65,6 +70,7 @@ class Validator:
         return list(hierarchies)
 
     def __get_hierarchy__(self, name):
+        """ Returns an ordered list of the item names in the specified hierarchy """
         items = []
         for item in self.metadata.items:
             if item.get_property('hierarchies') is not None:
@@ -79,12 +85,15 @@ class Validator:
         return item_names_in_order
 
     def __get_data_for_hierarchy__(self, name):
+        """ Returns the dataframe for a hierarchy """
         raise NotImplementedError()
 
     def __get_column_with_segmentation__(self, item:Item, segmentation: str):
+        """ Returns the data series for an item grouped by the segmentation column specified """
         raise NotImplementedError()
 
     def __check_hierarchy__(self, name):
+        """ Checks whether the named hierarchy conforms to a tree structure """
         # Create a dictionary to store the hierarchy
         hierarchy = {}
 
@@ -142,6 +151,7 @@ class Validator:
                 self.warnings.append(f"Validation warning: '{item.name}' has potentially anomalous data when segmented by '{segmentation}'")
 
     def check_data_type(self, item: Item):
+        """ Checks whether the item has the correct data type """
         expected_data_type = item.get_property('datatype')
         if expected_data_type is None:
             return True
@@ -165,9 +175,11 @@ class Validator:
         return False
 
     def check_column_present(self, item: Item):
+        """ Checks whether the column for an item is present in the data """
         raise NotImplementedError()
 
     def check_nulls(self, item: Item, allow_nulls=True):
+        """ Checks if there are any null values for an item """
         if self.__contains_nulls__(item):
             if allow_nulls:
                 self.warnings.append(f"Validation warning: '{item.name}' contains NULLs")
@@ -175,6 +187,7 @@ class Validator:
                 self.errors.append(f"Validation error: '{item.name}' contains NULLs")
 
     def check_domain(self, item: Item):
+        """ Checks that the values for an item conform to the domain in its specification """
         if item.get_property('domain') is not None:
             data_domain = self.__get_column_values__(item)
             metadata_domain = item.get_property('domain')
@@ -186,6 +199,7 @@ class Validator:
                     self.warnings.append(f"Validation error: '{str(metadata_element)}' is in domain of '{item.name}' but not present in the data")
 
     def check_range(self, item: Item):
+        """ Checks whether the values of an item fall within expected range """
         if item.get_property('range') is not None:
             min_value = item.get_property('range')[0]
             max_value = item.get_property('range')[1]
@@ -196,6 +210,7 @@ class Validator:
                 self.errors.append(f"Validation error: '{item.name}': '{str(data_max)}' is greater than '{str(max_value)}'")
 
     def check_pattern_match(self, item: Item):
+        """ Checks that the values for an item match the pattern in the specification """
         import re
         if item.get_property('pattern') is not None:
             values = self.__get_column_values__(item)
@@ -206,6 +221,7 @@ class Validator:
                         self.errors.append(f"Validation error: '{item.name}': '{str(value)}' does not match the pattern '{str(item.get_property('pattern'))}'")
 
     def check_quality_checks(self, item: Item):
+        """ Checks whether an item has any quality rules used in validation """
         if item.get_property('formula') is None:
             if item.get_property('range') is None:
                 if item.get_property('domain') is None:
@@ -213,6 +229,14 @@ class Validator:
                         self.warnings.append(f"Validation warning: '{item.name}' has no quality rules.")
 
     def validate_data(self, allow_nulls=True, check_hierarchies=False, detect_anomalies=False, segmentation=None):
+        """
+        Performs validation of data
+        :param allow_nulls: If True, nulls are shown as warnings rather than errors
+        :param check_hierarchies: If True, perform hierarchy consistency check
+        :param detect_anomalies: If True, perform anomaly detection
+        :param segmentation: Optional - field name to use for anomaly detection
+        :return: True if no validation errors are found
+        """
         for item in self.dataset_specification.items:
             metadata = self.metadata.get_metadata(item)
             if self.check_column_present(metadata):
