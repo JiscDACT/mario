@@ -168,7 +168,7 @@ class Validator:
 
         if actual_data_type == DataTypes.OBJECT and expected_data_type == DataTypes.DATE:
             self.warnings.append(f"Validation warning: '{item.name}': expected {expected_data_type} but was {actual_data_type}"
-                                 f"This is probably due to a limitation of Pandas not having a native 'Date' type")
+                                 f". This is probably due to a limitation of Pandas not having a native 'Date' type")
             return False
 
         self.errors.append(f"Validation error: '{item.name}' is of the wrong type - expected {expected_data_type}, actual {actual_data_type}")
