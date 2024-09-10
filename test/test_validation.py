@@ -423,7 +423,7 @@ def test_category_anomalies_hyper():
 
     # Introduce a segmentation variable
     df = extractor.get_data_frame()
-    df['Year'] = df['Ship Date'].astype(str).str[-4:]
+    df['Year'] = df['Ship Date'].astype(str).str[0:4]
 
     output_file_path = os.path.join('output', 'orders_with_segmentation.hyper')
     extractor.save_data_as_hyper(file_path=output_file_path, minimise=False)
