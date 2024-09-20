@@ -1,6 +1,7 @@
 import logging
 from enum import Enum
 
+from mario.data_extractor import Configuration
 from mario.dataset_specification import DatasetSpecification
 from mario.metadata import Metadata, Item
 
@@ -425,3 +426,91 @@ class HyperValidator(Validator):
                     hyper_domain = [item for row in rows for item in row]
         return hyper_domain
 
+
+class SqlValidator(Validator):
+    def __init__(self,
+                 dataset_specification: DatasetSpecification,
+                 metadata: Metadata,
+                 configuration: Configuration
+                 ):
+        super().__init__(dataset_specification, metadata)
+        self.connection = self.__get_connection__(configuration.connection_string)
+        self.schema = configuration.schema
+        self.view = configuration.view
+
+    def __get_connection__(self, connection_string: str):
+        from sqlalchemy import create_engine
+        engine = create_engine(connection_string)
+        connection = engine.connect().execution_options(stream_results=True)
+        return connection
+
+    def __get_column_with_segmentation__(self, item: Item, segmentation: str):
+        import pandas as pd
+        column = self.__get_column_name__(item)
+        sql = f"""
+                    SELECT COUNT(DISTINCT "{column}")
+                    FROM "{self.schema}"."{self.view}" 
+                    GROUP BY "{segmentation}"
+        """
+        return pd.read_sql(sql, self.connection)
+
+    def __get_column_data_type__(self, item: Item):
+        import pandas as pd
+        column = self.__get_column_name__(item)
+        sql = f"SELECT DATA_TYPE AS dt FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='{self.view}'" \
+              f" AND TABLE_SCHEMA='{self.schema}'" \
+              f" AND COLUMN_NAME='{column}'"
+        df = pd.read_sql(sql, self.connection)
+        type = df.at[0, 'dt']
+        if type in ['tinyint', 'int']:
+            return DataTypes.INT
+        elif type in ['char', 'varchar', 'nvarchar', 'varbinary', 'text']:
+            return DataTypes.TEXT
+        elif type in ['real', 'decimal', 'double precision']:
+            return DataTypes.DOUBLE
+        elif type in ['date']:
+            return DataTypes.DATE
+        elif type in ['datetime']:
+            return DataTypes.DATETIME
+        else:
+            return type
+
+    def __get_minimum_maximum_values__(self, item:Item):
+        import pandas as pd
+        column = self.__get_column_name__(item)
+        sql = f"SELECT min(\"{column}\") AS min_value, max(\"{column}\") as max_value FROM {self.schema}.{self.view}"
+        df = pd.read_sql(sql, self.connection)
+        min_value = df.at[0, 'min_value']
+        max_value = df.at[0, 'max_value']
+        return min_value, max_value
+
+    def __get_column_values__(self, item: Item):
+        import pandas as pd
+        column = self.__get_column_name__(item)
+        sql = f"SELECT DISTINCT \"{column}\" AS checkfield FROM {self.schema}.{self.view}"
+        df = pd.read_sql(sql, self.connection)
+        values = df['checkfield'].to_list()
+        return values
+
+    def __get_data_for_hierarchy__(self, name):
+        import pandas as pd
+        fields = ', '.join(f'"{s}"' for s in self.__get_hierarchy__(name))
+        sql = f"""
+                     SELECT
+                         {fields} 
+                     FROM "{self.schema}"."{self.view}" 
+                     GROUP BY {fields} 
+        """
+        return pd.read_sql(sql, self.connection)
+
+    def check_column_present(self, item: Item):
+        import pandas as pd
+        if item.get_property('formula') is not None:
+            return False
+        sql = f"SELECT COLUMN_NAME as col FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='{self.view}' AND TABLE_SCHEMA='{self.schema}'"
+        df = pd.read_sql(sql, self.connection)
+        values = df['col'].to_list()
+        if item.name not in values:
+            self.errors.append(f"Validation error: '{item.name}' in specification is missing from dataset")
+            return False
+        return True

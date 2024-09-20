@@ -5,7 +5,7 @@ import pytest
 from mario.data_extractor import DataExtractor, Configuration
 from mario.dataset_specification import dataset_from_json
 from mario.metadata import metadata_from_json, Item
-from mario.validation import DataFrameValidator, HyperValidator, Validator
+from mario.validation import DataFrameValidator, HyperValidator, Validator, SqlValidator
 
 
 def get_validator(nulls=False, hyperfile=False):
@@ -437,6 +437,7 @@ def test_category_anomalies_hyper():
 
     assert "Validation warning: 'Ship Mode' has potentially anomalous data when segmented by 'Year'" in validator.warnings
 
+
 def test_all_checks():
     dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
     metadata = metadata_from_json(os.path.join('test', 'metadata.json'))
@@ -464,4 +465,32 @@ def test_all_checks():
         validator.validate_data(check_hierarchies=True, detect_anomalies=True, segmentation='Year')
     assert len(validator.errors) == 1
     assert len(validator.warnings) == 11
+
+
+def test_all_checks_sql():
+    # Skip this test if we don't have a connection string
+    if not os.environ.get('CONNECTION_STRING'):
+        pytest.skip("Skipping SQL test as no database configured")
+
+    dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
+    metadata = metadata_from_json(os.path.join('test', 'metadata.json'))
+
+    configuration = Configuration(
+        view='superstore',
+        schema='dev',
+        connection_string=os.environ.get("CONNECTION_STRING")
+    )
+
+    validator = SqlValidator(
+        dataset_specification=dataset,
+        metadata=metadata,
+        configuration=configuration
+    )
+
+    with pytest.raises(ValueError):
+        validator.validate_data(check_hierarchies=True, detect_anomalies=False)
+
+    assert len(validator.errors) == 2
+    assert len(validator.warnings) == 7
+
 
