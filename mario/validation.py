@@ -205,6 +205,16 @@ class Validator:
                     if item.get_property('pattern') is None:
                         self.warnings.append(f"Validation warning: '{item.name}' has no quality rules.")
 
+    def validate_data_item(self, item, allow_nulls=True):
+        metadata = self.metadata.get_metadata(item)
+        if self.check_column_present(metadata):
+            self.check_nulls(metadata, allow_nulls)
+            self.check_domain(metadata)
+            self.check_range(metadata)
+            self.check_quality_checks(metadata)
+            self.check_data_type(metadata)
+            self.check_pattern_match(metadata)
+
     def validate_data(self, allow_nulls=True, check_hierarchies=False, detect_anomalies=False, segmentation=None):
         """
         Performs validation of data
@@ -215,14 +225,7 @@ class Validator:
         :return: True if no validation errors are found
         """
         for item in self.dataset_specification.items:
-            metadata = self.metadata.get_metadata(item)
-            if self.check_column_present(metadata):
-                self.check_nulls(metadata, allow_nulls)
-                self.check_domain(metadata)
-                self.check_range(metadata)
-                self.check_quality_checks(metadata)
-                self.check_data_type(metadata)
-                self.check_pattern_match(metadata)
+            self.validate_data_item(item, allow_nulls)
         if check_hierarchies:
             self.check_hierarchies()
         if detect_anomalies:

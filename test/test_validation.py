@@ -476,3 +476,33 @@ def test_all_checks_sql():
     assert len(validator.warnings) == 7
 
 
+def test_checks_iteratively():
+    dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
+    metadata = metadata_from_json(os.path.join('test', 'metadata.json'))
+    file_path = os.path.join('test', 'orders.csv')
+
+    configuration = Configuration(
+        file_path=file_path
+    )
+    extractor = DataExtractor(
+        dataset_specification=dataset,
+        metadata=metadata,
+        configuration=configuration
+    )
+    validator = DataFrameValidator(
+        dataset_specification=dataset,
+        metadata=metadata,
+        data=extractor.get_data_frame(minimise=False)
+    )
+    for item in dataset.items:
+        validator.errors = []
+        validator.warnings = []
+        validator.validate_data_item(item, allow_nulls=False)
+        assert validator.errors == []
+        if item == 'Ship Date':
+            assert len(validator.warnings) == 2
+        elif item in ['Country/Region', 'State/Province', 'City', 'Product Name', 'Sales', 'Profit']:
+            assert len(validator.warnings) == 1
+        else:
+            assert len(validator.warnings) == 0
+
