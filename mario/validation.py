@@ -61,30 +61,6 @@ class Validator:
         """ Returns True if the item has any Null values in the data """
         return None in self.__get_column_values__(item)
 
-    def __get_hierarches__(self):
-        """ Returns a list of all hierarchies in the metadata """
-        hierarchies = set()
-        for item in self.metadata.items:
-            if item.get_property('hierarchies') is not None:
-                for hierarchy in item.get_property('hierarchies'):
-                    hierarchies.add(hierarchy['hierarchy'])
-        return list(hierarchies)
-
-    def __get_hierarchy__(self, name):
-        """ Returns an ordered list of the item names in the specified hierarchy """
-        items = []
-        for item in self.metadata.items:
-            if item.get_property('hierarchies') is not None:
-                for hierarchy in item.get_property('hierarchies'):
-                    if hierarchy['hierarchy'] == name:
-                        items.append({'name': item.name, 'level': hierarchy['level']})
-
-        # Sort the list of dictionaries by 'level'
-        sorted_items = sorted(items, key=lambda x: x['level'])
-        # Extract the 'name' values in order
-        item_names_in_order = [item['name'] for item in sorted_items]
-        return item_names_in_order
-
     def __get_data_for_hierarchy__(self, name):
         """ Returns the dataframe for a hierarchy """
         raise NotImplementedError()
@@ -99,7 +75,7 @@ class Validator:
         hierarchy = {}
 
         # Get the levels
-        levels = self.__get_hierarchy__(name)
+        levels = self.metadata.get_hierarchy(name)
 
         # Get the data
         df = self.__get_data_for_hierarchy__(name)
@@ -135,7 +111,7 @@ class Validator:
         Checks the validity of hierarchies, i.e. that they form a tree structure and
         adds any anomalies found to errors/warnings
         """
-        for hierarchy in self.__get_hierarches__():
+        for hierarchy in self.metadata.get_hierarchies():
             self.__check_hierarchy__(hierarchy)
 
     def check_category_anomalies(self, segmentation: str):
@@ -305,7 +281,7 @@ class DataFrameValidator(Validator):
         return data_min, data_max
 
     def __get_data_for_hierarchy__(self, name):
-        fields = self.__get_hierarchy__(name)
+        fields = self.metadata.get_hierarchy(name)
         return self.data[fields].drop_duplicates().reset_index(drop=True)
 
     def check_column_present(self, item: Item):
@@ -342,7 +318,7 @@ class HyperValidator(Validator):
 
     def __get_data_for_hierarchy__(self, name):
         from pantab import frame_from_hyper_query
-        fields = ', '.join(f'"{s}"' for s in self.__get_hierarchy__(name))
+        fields = ', '.join(f'"{s}"' for s in self.metadata.get_hierarchy(name))
         query = f"""
                      SELECT
                          {fields} 
@@ -494,7 +470,7 @@ class SqlValidator(Validator):
 
     def __get_data_for_hierarchy__(self, name):
         import pandas as pd
-        fields = ', '.join(f'"{s}"' for s in self.__get_hierarchy__(name))
+        fields = ', '.join(f'"{s}"' for s in self.metadata.get_hierarchy(name))
         sql = f"""
                      SELECT
                          {fields} 

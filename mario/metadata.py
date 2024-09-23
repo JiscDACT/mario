@@ -62,6 +62,30 @@ class Metadata(Item):
         for item in metadata.items:
             self.add_item(item)
 
+    def get_hierarchies(self):
+        """ Returns a list of all hierarchies in the metadata """
+        hierarchies = set()
+        for item in self.items:
+            if item.get_property('hierarchies') is not None:
+                for hierarchy in item.get_property('hierarchies'):
+                    hierarchies.add(hierarchy['hierarchy'])
+        return list(hierarchies)
+
+    def get_hierarchy(self, name):
+        """ Returns an ordered list of the item names in the specified hierarchy """
+        items = []
+        for item in self.items:
+            if item.get_property('hierarchies') is not None:
+                for hierarchy in item.get_property('hierarchies'):
+                    if hierarchy['hierarchy'] == name:
+                        items.append({'name': item.name, 'level': hierarchy['level']})
+
+        # Sort the list of dictionaries by 'level'
+        sorted_items = sorted(items, key=lambda x: x['level'])
+        # Extract the 'name' values in order
+        item_names_in_order = [item['name'] for item in sorted_items]
+        return item_names_in_order
+
     def save(self, file_path: str = None) -> None:
         json_representation = {
             "collection": {
