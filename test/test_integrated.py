@@ -183,3 +183,27 @@ def test_integration_tdsx_streaming():
     os.makedirs(os.path.join('output', dataset.collection), exist_ok=True)
     builder.build(file_path=path, output_format=Format.TABLEAU_PACKAGED_DATASOURCE)
 
+
+def test_remove_redundant_hierarchies():
+    metadata_file = os.path.join('test', 'metadata.json')
+    metadata = metadata_from_json(file_path=metadata_file)
+    dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
+    dataset.collection = 'test_remove_redundant_hierarchies'
+
+    # remove an item so we have a one-item hierarchy for "Product"
+    dataset.dimensions.remove("Product Name")
+    assert "Product Name" not in dataset.items
+
+    configuration = Configuration(file_path=os.path.join('test', 'orders.hyper'))
+    extractor = HyperFile(configuration=configuration, dataset_specification=dataset, metadata=metadata)
+    builder = DatasetBuilder(dataset_specification=dataset, metadata=metadata, data=extractor)
+
+    # remove the product hierarchy
+    builder.remove_redundant_hierarchies()
+
+    assert "Product" not in metadata.get_hierarchies()
+    assert "Location" in metadata.get_hierarchies()
+
+    path = os.path.join('output', dataset.collection, dataset.name + '.tdsx')
+    os.makedirs(os.path.join('output', dataset.collection), exist_ok=True)
+    builder.build(file_path=path, output_format=Format.TABLEAU_PACKAGED_DATASOURCE)
