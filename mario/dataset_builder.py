@@ -5,7 +5,6 @@ import tempfile
 from enum import Enum
 
 
-
 from mario.data_extractor import DataExtractor
 from mario.dataset_specification import DatasetSpecification
 from mario.metadata import Metadata
@@ -50,6 +49,20 @@ class DatasetBuilder:
         else:
             logger.info(self.dataset_specification.name + ": All metadata present")
             return True
+
+    def remove_redundant_hierarchies(self):
+        """
+        Modifies the metadata to remove any hierarchies that contain
+        only one item.
+        :return: None
+        """
+        for hierarchy in self.metadata.get_hierarchies():
+            items = self.metadata.get_hierarchy(hierarchy)
+            items = [item for item in items if item in self.dataset_specification.items]
+            if len(items) == 1:
+                for item in self.metadata.items:
+                    if 'hierarchies' in item.properties:
+                        item.set_property('hierarchies',  [h for h in item.get_property('hierarchies') if h['hierarchy'] != hierarchy])
 
     def build(self, output_format: Format, file_path: str, template_path: str = None):
         if output_format == Format.TABLEAU_PACKAGED_DATASOURCE:

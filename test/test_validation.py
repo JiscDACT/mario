@@ -297,24 +297,6 @@ def test_pattern_validation_fails():
     assert "Validation error: 'Order Identifier': 'CA-2019-115238' does not match the pattern 'US-20\\d\\d-\\d{6}'" in validator.errors
 
 
-def test_get_hierarchies():
-    dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
-    metadata = metadata_from_json(os.path.join('test', 'metadata.json'))
-    validator = Validator(dataset_specification=dataset, metadata=metadata)
-    hierarchies = validator.__get_hierarches__()
-    assert len(hierarchies) == 2
-    assert 'Product' in hierarchies
-    assert 'Location' in hierarchies
-
-
-def test_get_hierarchy():
-    dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
-    metadata = metadata_from_json(os.path.join('test', 'metadata.json'))
-    validator = Validator(dataset_specification=dataset, metadata=metadata)
-    products = validator.__get_hierarchy__('Product')
-    assert products == ['Category', 'Product Name']
-
-
 def test_get_hierarchy_data():
     dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
     metadata = metadata_from_json(os.path.join('test', 'metadata.json'))

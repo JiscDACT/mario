@@ -42,3 +42,16 @@ def test_load_excel():
     domain = metadata.get_metadata('ShipMode (First Class / Same Day / Second Class/Standard Class)').get_property('domain')
     assert 'First Class' in domain
 
+
+def test_get_hierarchies():
+    metadata = metadata_from_json(os.path.join('test', 'metadata.json'))
+    hierarchies = metadata.get_hierarchies()
+    assert len(hierarchies) == 2
+    assert 'Product' in hierarchies
+    assert 'Location' in hierarchies
+
+
+def test_get_hierarchy():
+    metadata = metadata_from_json(os.path.join('test', 'metadata.json'))
+    products = metadata.get_hierarchy('Product')
+    assert products == ['Category', 'Product Name']
