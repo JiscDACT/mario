@@ -6,7 +6,8 @@
       {
         "name": "Order Identifier",
         "description": "The identifier for the order",
-        "physical_column_name": "Order ID"
+        "physical_column_name": "Order ID",
+        "pattern": "(US|CA)-20\\d\\d-\\d{6}"
       },
       {
         "name": "Ship Mode",
@@ -21,6 +22,7 @@
       {
         "name": "Ship Date",
         "description": "Date of shipping",
+        "datatype": "date",
         "groups": [
           "Shipping"
         ]
@@ -28,6 +30,7 @@
       {
         "name": "Category",
         "description": "Category of item",
+        "domain":["Furniture", "Office Supplies", "Technology"],
         "groups": [
           "Product"
         ],
@@ -64,6 +67,7 @@
       {
         "name": "Region",
         "description": "Region",
+        "domain": ["Central","East","South","West"],
         "hierarchies": [
           {
             "hierarchy": "Location",
@@ -94,6 +98,7 @@
       {
         "name": "Postal Code",
         "description": "Postal Code",
+        "pattern": "(\\d{4,5})|([A-Z]\\d[A-Z])",
         "hierarchies": [
           {
             "hierarchy": "Location",

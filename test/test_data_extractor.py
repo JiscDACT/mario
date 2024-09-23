@@ -6,7 +6,7 @@ import logging
 import pandas as pd
 import pytest
 
-from mario.data_extractor import DataExtractor, Configuration, StreamingDataExtractor
+from mario.data_extractor import DataExtractor, Configuration, StreamingDataExtractor, DataFrameExtractor
 from mario.dataset_specification import dataset_from_json
 from mario.metadata import metadata_from_json
 from mario.query_builder import ViewBasedQueryBuilder, SubsetQueryBuilder
@@ -49,11 +49,11 @@ def test_csv_to_hyper():
         extractor.save_data_as_hyper(file_path=file.name)
 
 
-def test_hyper_to_csv():
+def test_hyper_with_nulls_to_csv():
     dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
     metadata = metadata_from_json(os.path.join('test', 'metadata.json'))
     configuration = Configuration(
-        file_path=os.path.join('test', 'orders.hyper')
+        file_path=os.path.join('test', 'orders_with_nulls.hyper')
     )
     extractor = DataExtractor(
         dataset_specification=dataset,
@@ -67,10 +67,8 @@ def test_hyper_to_csv():
         extractor.save_data_as_csv(file_path=file.name)
 
 
-def test_hyper_to_csv_without_nulls():
+def test_hyper_without_nulls_to_csv():
     dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
-    # postal code has NULLs
-    dataset.dimensions.remove('Postal Code')
     metadata = metadata_from_json(os.path.join('test', 'metadata.json'))
     configuration = Configuration(
         file_path=os.path.join('test', 'orders.hyper')
@@ -312,6 +310,8 @@ def test_csv_totals():
     )
     extractor.validate_data()
     assert extractor.get_total() == 2326534.3543
+    assert extractor.get_total(measure='Sales') == 2326534.3543
+    assert round(extractor.get_total(measure='Profit'), 4) == 292296.8146
 
 
 def test_csv_total_profit():
@@ -330,13 +330,31 @@ def test_csv_total_profit():
     assert round(extractor.get_total(), 4) == 292296.8146
 
 
+def test_csv_total_no_measures():
+    dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
+    dataset.measures = []
+    metadata = metadata_from_json(os.path.join('test', 'metadata.json'))
+    configuration = Configuration(
+        file_path=os.path.join('test', 'orders.csv')
+    )
+    extractor = DataExtractor(
+        dataset_specification=dataset,
+        metadata=metadata,
+        configuration=configuration
+    )
+    extractor.validate_data()
+    assert extractor.get_total() == 10194
+    with pytest.raises(ValueError):
+        extractor.get_total(measure='Sales')
+
+
 def test_stream_sql_subset_to_csv_with_total():
     # Skip this test if we don't have a connection string
     if not os.environ.get('CONNECTION_STRING'):
         pytest.skip("Skipping SQL test as no database configured")
 
     dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
-    dataset.measures = ['Sales']
+    dataset.measures = ['Sales', 'Profit']
     dataset.dimensions = ['Product Name']
     metadata = metadata_from_json(os.path.join('test', 'metadata.json'))
     configuration = Configuration(
@@ -352,10 +370,11 @@ def test_stream_sql_subset_to_csv_with_total():
     )
     file = tempfile.NamedTemporaryFile(suffix='.csv')
     extractor.stream_sql_to_csv(file_path=file.name, chunk_size=1000)
-    total = extractor.get_total()
     df = pd.read_csv(file)
     assert len(df) == 1849
-    assert round(total, 2) == 2326534.35
+    assert round(extractor.get_total(), 4) == 2326534.3543
+    assert round(extractor.get_total(measure='Sales'), 4) == 2326534.3543
+    assert round(extractor.get_total(measure='Profit'), 4) == 292296.8146
 
 
 def test_stream_sql_view_to_csv_with_total():
@@ -408,3 +427,16 @@ def test_validate_data_on_streaming_extractor():
     )
     with pytest.raises(ValueError):
         extractor.validate_data()
+
+
+def test_dataframe_extractor():
+    df = pd.read_csv(os.path.join('test', 'orders.csv'))
+    dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
+    metadata = metadata_from_json(os.path.join('test', 'metadata.json'))
+    extractor = DataFrameExtractor(
+        dataset_specification=dataset,
+        metadata=metadata,
+        dataframe=df
+    )
+    assert extractor.validate_data()
+    assert extractor.get_total() == 2326534.3543
