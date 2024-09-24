@@ -114,6 +114,13 @@ class Validator:
         for hierarchy in self.metadata.get_hierarchies():
             self.__check_hierarchy__(hierarchy)
 
+    def check_item_for_anomalies(self, item: str, segmentation: str):
+        item = self.metadata.get_metadata(item)
+        subset = self.__get_column_with_segmentation__(item, segmentation)
+        if self.__check_for_anomalies__(subset):
+            self.warnings.append(
+                f"Validation warning: '{item.name}' has potentially anomalous data when segmented by '{segmentation}'")
+
     def check_category_anomalies(self, segmentation: str):
         """
         Checks to see if we get anomalies in how categories are split e.g. over time
@@ -122,10 +129,7 @@ class Validator:
         :return: None
         """
         for dimension in self.dataset_specification.dimensions:
-            item = self.metadata.get_metadata(dimension)
-            subset = self.__get_column_with_segmentation__(item, segmentation)
-            if self.__check_for_anomalies__(subset):
-                self.warnings.append(f"Validation warning: '{item.name}' has potentially anomalous data when segmented by '{segmentation}'")
+            self.check_item_for_anomalies(dimension, segmentation)
 
     def check_data_type(self, item: Item):
         """ Checks whether the item has the correct data type """
