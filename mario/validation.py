@@ -177,7 +177,7 @@ class Validator:
                     self.errors.append(f"Validation error: '{str(element)}' is not in domain of '{item.name}'")
             for metadata_element in metadata_domain:
                 if metadata_element not in data_domain:
-                    self.warnings.append(f"Validation error: '{str(metadata_element)}' is in domain of '{item.name}' but not present in the data")
+                    self.warnings.append(f"Validation warning: '{str(metadata_element)}' is in domain of '{item.name}' but not present in the data")
 
     def check_range(self, item: Item):
         """ Checks whether the values of an item fall within expected range """
