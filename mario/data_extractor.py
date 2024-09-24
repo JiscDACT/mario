@@ -198,7 +198,7 @@ class HyperFile(DataExtractor):
         self.configuration = configuration
 
     def validate_data(self, allow_nulls=False):
-        from validation import HyperValidator
+        from mario.validation import HyperValidator
         validator = HyperValidator(
             dataset_specification=self.dataset_specification,
             metadata=self.metadata,
