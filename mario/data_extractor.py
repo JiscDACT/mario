@@ -197,7 +197,7 @@ class HyperFile(DataExtractor):
         super().__init__(Configuration(), dataset_specification, metadata)
         self.configuration = configuration
 
-    def validate_data(self, allow_nulls=False):
+    def validate_data(self, allow_nulls=True):
         from mario.validation import HyperValidator
         validator = HyperValidator(
             dataset_specification=self.dataset_specification,
@@ -300,7 +300,7 @@ class StreamingDataExtractor(DataExtractor):
                             table: str = 'Extract',
                             schema: str = 'Extract',
                             validate: bool = False,
-                            allow_nulls: bool = False,
+                            allow_nulls: bool = True,
                             minimise: bool = False,
                             chunk_size: int = 100000):
         """
@@ -328,7 +328,7 @@ class StreamingDataExtractor(DataExtractor):
     def stream_sql_to_csv(self,
                           file_path,
                           validate: bool = False,
-                          allow_nulls: bool = False,
+                          allow_nulls: bool = True,
                           chunk_size: int = 100000,
                           compress_using_gzip: bool = False,
                           minimise: bool = False
