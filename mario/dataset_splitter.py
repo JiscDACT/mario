@@ -4,6 +4,9 @@ A utility for partitioning dataset files by a particular field
 import os
 import shutil
 import csv
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class DatasetSplitter:
@@ -34,6 +37,7 @@ class DatasetSplitter:
 
         # Delete the output path if it exists
         if os.path.exists(self.output_path):
+            logger.info(f"Removing output path at {self.output_path}")
             shutil.rmtree(self.output_path)
 
         os.makedirs(self.output_path)
@@ -63,6 +67,7 @@ class DatasetSplitter:
         """
         for file in os.listdir(self.source_path):
             if not file.endswith('.xlsx') and not file.endswith('.csv'):
+                logger.info(f"Copying file {file} to output directory")
                 for output_directory in os.listdir(self.output_path):
                     if os.path.isdir(os.path.join(self.output_path, output_directory)):
                         shutil.copyfile(
@@ -82,6 +87,8 @@ class DatasetSplitter:
             writer.writerow(row)
 
     def split_csv(self, file_name: str, batch_size=10000):
+
+        logger.info(f"Splitting CSV file {file_name}")
 
         # Dict for holding open file handles
         file_handles = {}
@@ -139,6 +146,7 @@ class DatasetSplitter:
     def split_excel(self, file_name: str, batch_size=10000):
         import pandas as pd
         from openpyxl import load_workbook
+
         file_path = os.path.join(self.source_path, file_name)
         sheet_names = pd.ExcelFile(file_path, engine='openpyxl').sheet_names
         original_wb = load_workbook(file_path, data_only=True)
@@ -152,10 +160,12 @@ class DatasetSplitter:
                 break
 
         if pivot:
+            logger.info(f"Splitting excel pivot {file_name}")
             self.split_excel_pivot(file_name=file_name, file_path=file_path, sheet_name=pivot_sheet_name)
         else:
             workbook_handles = {}
             for sheet_name in sheet_names:
+                logger.info(f"Splitting excel file without pivots {file_path}")
                 self.split_excel_table(file_path=file_path, sheet_name=sheet_name, workbook_handles=workbook_handles,
                                        batch_size=batch_size)
                 for value, wb in workbook_handles.items():
