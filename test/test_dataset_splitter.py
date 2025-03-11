@@ -22,6 +22,10 @@ def test_dataset_splitter():
     dataset_splitter.split_files()
     dataset_splitter.copy_other_files()
     assert 'Central' in os.listdir(os.path.join('output', 'test_split_source'))
+    assert 'orders.csv' in os.listdir(os.path.join('output', 'test_split_source', 'Central'))
+    assert 'orders.xlsx' in os.listdir(os.path.join('output', 'test_split_source', 'Central'))
+    assert 'README.txt' in os.listdir(os.path.join('output', 'test_split_source', 'Central'))
+
     assert len(os.listdir(os.path.join('output', 'test_split_source'))) == 4
 
     total_rows = 0
