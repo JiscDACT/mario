@@ -43,12 +43,17 @@ class DatasetSplitter:
 
     def split_files(self):
         # Iterate over each file in the source folder
+        split_files_count = 0
         for file in os.listdir(self.source_path):
             if os.path.isfile(os.path.join(self.source_path, file)):
                 if file.endswith('.xlsx'):
                     self.split_excel(file)
+                    split_files_count += 1
                 elif file.endswith('.csv'):
                     self.split_csv(file)
+                    split_files_count += 1
+        if split_files_count == 0:
+            raise ValueError("No files were split")
 
     def copy_other_files(self) -> None:
         """

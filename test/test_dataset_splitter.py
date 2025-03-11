@@ -26,6 +26,18 @@ def test_dataset_splitter_output_dir_has_subdirectories():
     shutil.rmtree(output_dir)
 
 
+def test_dataset_splitter_output_dir_has_deep_subdirectories():
+    output_dir = os.path.join('output', 'test_dataset_splitter_output_dir_has_deep_subdirectories')
+    os.makedirs(os.path.join(output_dir, 'fruit', 'banana', 'yellow'), exist_ok=True)
+    with pytest.raises(ValueError):
+        DatasetSplitter(
+            field='Region',
+            source_path=os.path.join('test', 'test_split_source'),
+            output_path=output_dir
+        )
+    shutil.rmtree(output_dir)
+
+
 def test_dataset_splitter_source_dir_does_not_exist():
     output_dir = os.path.join('output', 'test_dataset_splitter_source_dir_does_not_exist')
     os.makedirs(output_dir, exist_ok=True)
@@ -64,6 +76,23 @@ def test_dataset_splitter_source_and_output_are_the_same():
             output_path=output_dir
         )
 
+    shutil.rmtree(output_dir)
+
+
+def test_dataset_splitter_no_files_to_split():
+    source_dir = os.path.join('output', 'test_dataset_splitter_no_files_to_split_source')
+    output_dir = os.path.join('output', 'test_dataset_splitter_no_files_to_split_output')
+    os.makedirs(output_dir, exist_ok=True)
+    os.makedirs(source_dir, exist_ok=True)
+    shutil.copyfile(os.path.join('test', 'README.md'), os.path.join(output_dir, 'README.md'))
+    with pytest.raises(ValueError) as e:
+        data_splitter = DatasetSplitter(
+            field='Region',
+            source_path=source_dir,
+            output_path=output_dir
+        )
+        data_splitter.split_files()
+    shutil.rmtree(source_dir)
     shutil.rmtree(output_dir)
 
 
