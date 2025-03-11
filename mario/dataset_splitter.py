@@ -13,7 +13,26 @@ class DatasetSplitter:
         self.source_path = source_path
         self.output_path = output_path
 
-        # Clean up first
+        # If the source path doesn't exist, raise an error
+        if not os.path.exists(self.source_path):
+            raise FileNotFoundError("Source folder doesn't exist.")
+
+        # If the source path and output path are the same, raise an error
+        if self.source_path == self.output_path:
+            raise ValueError("Source and output folders can't be the same.")
+
+        # If the output path contains subdirectories, raise an error
+        if os.path.exists(self.output_path):
+            if any(os.path.relpath(root, self.output_path).count(os.sep) > 0 for root, dirs, _ in os.walk(self.output_path)):
+                raise ValueError("Output folder contains subdirectories so is probably not something you "
+                                 "want to delete and overwrite.")
+
+        # If the source path contains subdirectories, raise an error
+        if next(os.walk(self.source_path))[1]:
+            raise ValueError("Source folder contains subdirectories so is probably not something you "
+                             "want to split as the subdirectories aren't going to be processed.")
+
+        # Delete the output path if it exists
         if os.path.exists(self.output_path):
             shutil.rmtree(self.output_path)
 
