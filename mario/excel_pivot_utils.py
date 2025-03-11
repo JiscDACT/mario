@@ -60,22 +60,24 @@ def get_subset(pivot_cache, field_name, field_value):
 
 
 def get_unique_values(file_path, sheet_name, field) -> List[str]:
-    cached_data = read_pivot_cache(file_path, sheet_name)
-    return get_values_for_pivot_cache_column(cached_data, field)
-
-
-def get_values_for_pivot_cache_column(pivot_data, column_name) -> List[str]:
     """
-    Returns all the unique values for a column in a pivot
-    :param pivot_data: the cached data for a pivot
-    :param column_name: the column name
+    Returns all the unique values for a column in a pivot cache
+    :param file_path: the workbook file path
+    :param sheet_name: the name of the sheet
+    :param field: the field to get values for
     :return: a list of unique values for the specified column in the cache
     """
+    from openpyxl import load_workbook
+    wb = load_workbook(file_path, data_only=True)
+    ws = wb[sheet_name]
+    pivot = ws._pivots[0]
+    cached_data = pivot.cache
+
     items = []
 
-    for field in pivot_data.cacheFields:
-        if field.name == column_name:
-            for item in field.sharedItems._fields:
+    for f in cached_data.cacheFields:
+        if f.name == field:
+            for item in f.sharedItems._fields:
                 if hasattr(item, 'v'):
                     items.append(item.v)
                 elif hasattr(item, 'n'):
@@ -86,22 +88,9 @@ def get_values_for_pivot_cache_column(pivot_data, column_name) -> List[str]:
                     items.append(item)
 
     if len(items) == 0:
-        raise ValueError(f"Column '{column_name}' not found in pivot_data")
+        raise ValueError(f"Column '{field}' not found in pivot_data")
 
     # Use a set to get unique values
     unique_values = set(items)
     return list(unique_values)
 
-
-def read_pivot_cache(file_path, sheet_name):
-    """
-    Reads the cached data from a pivot
-    :param file_path: the Excel file path
-    :param sheet_name: the name of the sheet containing a pivot
-    :return:
-    """
-    from openpyxl import load_workbook
-    wb = load_workbook(file_path, data_only=True)
-    ws = wb[sheet_name]
-    pivot = ws._pivots[0]
-    return pivot.cache
