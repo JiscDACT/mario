@@ -1,9 +1,31 @@
-def replace_pivot_cache(worksheet, subset):
+from typing import List
+
+
+def replace_pivot_cache_with_subset(worksheet, field, value) -> None:
+    """
+    Replaces the cached data for a pivot with a subset filtered by
+    the supplied field and value
+    :param worksheet: the sheet to filter
+    :param field: the field name
+    :param value: the field value to filter by
+    :return: None
+    """
+    pivot = worksheet._pivots[0]
+    cached_data = pivot.cache
+    subset = get_subset(cached_data, field, value)
     pivot_cache = worksheet._pivots[0].cache
     pivot_cache.records.r = subset
 
 
 def get_subset(pivot_cache, field_name, field_value):
+    """
+    Returns a subset from pivot cache data using the field
+    name and field value as a filter
+    :param pivot_cache: the cache to filter
+    :param field_name: the name of the field to filter by
+    :param field_value: the value to filter by
+    :return: a filtered pivot cache
+    """
     # Get the index of the field name
     field_index = None
     cache_field = None
@@ -37,7 +59,18 @@ def get_subset(pivot_cache, field_name, field_value):
     return filtered_records
 
 
-def get_values_for_pivot_cache_column(pivot_data, column_name):
+def get_unique_values(file_path, sheet_name, field) -> List[str]:
+    cached_data = read_pivot_cache(file_path, sheet_name)
+    return get_values_for_pivot_cache_column(cached_data, field)
+
+
+def get_values_for_pivot_cache_column(pivot_data, column_name) -> List[str]:
+    """
+    Returns all the unique values for a column in a pivot
+    :param pivot_data: the cached data for a pivot
+    :param column_name: the column name
+    :return: a list of unique values for the specified column in the cache
+    """
     items = []
 
     for field in pivot_data.cacheFields:
@@ -61,6 +94,12 @@ def get_values_for_pivot_cache_column(pivot_data, column_name):
 
 
 def read_pivot_cache(file_path, sheet_name):
+    """
+    Reads the cached data from a pivot
+    :param file_path: the Excel file path
+    :param sheet_name: the name of the sheet containing a pivot
+    :return:
+    """
     from openpyxl import load_workbook
     wb = load_workbook(file_path, data_only=True)
     ws = wb[sheet_name]

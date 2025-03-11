@@ -86,15 +86,11 @@ class DatasetSplitter:
             handle.close()
 
     def split_excel_pivot(self, file_name: str, file_path: str, sheet_name: str):
-        from mario.excel_pivot_utils import read_pivot_cache
-        from mario.excel_pivot_utils import get_values_for_pivot_cache_column, get_subset, replace_pivot_cache
+        from mario.excel_pivot_utils import get_unique_values, replace_pivot_cache_with_subset
         from openpyxl import load_workbook
 
-        # Read the cache
-        cached_data = read_pivot_cache(file_path=file_path, sheet_name=sheet_name)
-
         # Get the values to split by
-        values = get_values_for_pivot_cache_column(cached_data, self.field)
+        values = get_unique_values(file_path=file_path, sheet_name=sheet_name, field=self.field)
 
         for value in values:
             # Copy workbook
@@ -104,17 +100,15 @@ class DatasetSplitter:
                 self.get_output_path(file_name, value)
             )
 
-            # Load the workbook
+            # Load the split workbook
             wb = load_workbook(self.get_output_path(file_name, value))
             ws = wb[sheet_name]
             for pivot in ws._pivots:
                 pivot.cache.refreshOnLoad = True
-                pivot.cache.enableRefresh = True
             wb.save(self.get_output_path(file_name, value))
 
-            # Split the data and replace the cache
-            subset = get_subset(cached_data, self.field, value)
-            replace_pivot_cache(ws, subset)
+            # Filter the data in the cache
+            replace_pivot_cache_with_subset(ws, self.field, value)
 
             wb.save(self.get_output_path(file_name, value))
 
