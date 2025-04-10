@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='mario-pipeline-tools',
-    version='0.36',
+    version='0.37',
     packages=['mario'],
     url='https://github.com/JiscDACT/mario',
     license='all rights reserved',
