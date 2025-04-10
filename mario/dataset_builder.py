@@ -105,7 +105,7 @@ class DatasetBuilder:
         self.data.save_data_as_csv(file_path=file_path)
 
     def __build_tdsx__(self, file_path: str):
-        from tableau_builder.hyper_utils import get_default_table_and_schema
+        from mario.hyper_utils import get_default_table_and_schema
         from tableau_builder.json_metadata import JsonRepository
         with tempfile.TemporaryDirectory() as temp_folder:
 
@@ -119,7 +119,7 @@ class DatasetBuilder:
             self.data.save_data_as_hyper(file_path=data_file_path)
 
             # Get the table and schema name from the extract
-            table_schema = get_default_table_and_schema(data_file_path)
+            schema, table = get_default_table_and_schema(data_file_path)
 
             # Save the spec
             dataset_file_path = os.path.join(temp_folder, 'dataset.json')
@@ -134,8 +134,8 @@ class DatasetBuilder:
                 data_file=data_file_path,
                 output_file=output_path,
                 data_source_type=HYPER,
-                table_name=table_schema['table'],
-                schema_name=table_schema['schema'],
+                table_name=table,
+                schema_name=schema,
                 use_metadata_groups=True
             )
             shutil.copyfile(src=output_path + '.tdsx', dst=file_path)

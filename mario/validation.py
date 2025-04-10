@@ -316,12 +316,11 @@ class HyperValidator(Validator):
                  hyper_file_path
                  ):
         super().__init__(dataset_specification, metadata)
-
-        from tableau_builder.hyper_utils import get_default_table_and_schema
+        from mario.hyper_utils import get_default_table_and_schema
         self.hyper_file_path = hyper_file_path
-        table_schema = get_default_table_and_schema(self.hyper_file_path)
-        self.table = table_schema['table']
-        self.schema = table_schema['schema']
+        schema, table = get_default_table_and_schema(self.hyper_file_path)
+        self.table = table
+        self.schema = schema
 
     def __get_data_for_hierarchy__(self, name):
         from pantab import frame_from_hyper_query
@@ -354,13 +353,13 @@ class HyperValidator(Validator):
 
     def check_column_present(self, item: Item):
         column = self.__get_column_name__(item)
-        from tableau_builder.hyper_utils import check_column_exists
+        from mario.hyper_utils import check_column_exists
         if item.get_property('formula') is None:
             if not check_column_exists(
-                    hyper_path=self.hyper_file_path,
-                    column_name=column,
-                    table_name=self.table,
-                    schema_name=self.schema
+                    hyper_file_path=self.hyper_file_path,
+                    column=column,
+                    table=self.table,
+                    schema=self.schema
             ):
                 self.errors.append(f"Validation error: '{item.name}' in specification is missing from dataset")
                 return False
@@ -368,10 +367,10 @@ class HyperValidator(Validator):
         return False
 
     def __get_column_data_type__(self, item: Item):
-        from tableau_builder.hyper_utils import get_table
+        from mario.hyper_utils import get_table
         from tableauhyperapi import TypeTag
         column = self.__get_column_name__(item)
-        table = get_table(hyper_path=self.hyper_file_path, table_name=self.table, schema_name=self.schema)
+        table = get_table(hyper_path=self.hyper_file_path, table=self.table, schema=self.schema)
         datatype = table.get_column_by_name(column).type.tag
         if datatype in [TypeTag.TEXT, TypeTag.CHAR]:
             return DataTypes.TEXT

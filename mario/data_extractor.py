@@ -95,11 +95,11 @@ class DataExtractor:
         self._data = pd.read_csv(self.configuration.file_path)
 
     def __load_from_hyper__(self):
-        from tableau_builder import hyper_utils
         import pantab
         from tableauhyperapi import TableName
-        table_parts = hyper_utils.get_default_table_and_schema(hyper_path=self.configuration.file_path)
-        table = TableName(table_parts['schema'], table_parts['table'])
+        from mario.hyper_utils import get_default_table_and_schema
+        schema, table = get_default_table_and_schema(hyper_path=self.configuration.file_path)
+        table = TableName(schema, table)
         self._data = pantab.frame_from_hyper(
             source=self.configuration.file_path,
             table=table
@@ -207,14 +207,14 @@ class HyperFile(DataExtractor):
         return validator.validate_data(allow_nulls)
 
     def __minimise_data__(self):
-        from tableau_builder import hyper_utils
+        from mario.hyper_utils import get_default_table_and_schema, drop_columns_from_hyper
         columns_to_keep = self.dataset_specification.items
-        table = hyper_utils.get_default_table_and_schema(self.configuration.file_path)
-        hyper_utils.subset_columns(
+        schema, table = get_default_table_and_schema(self.configuration.file_path)
+        drop_columns_from_hyper(
+            hyper_file_path=self.configuration.file_path,
             columns_to_keep=columns_to_keep,
-            hyper_path=self.configuration.file_path,
-            schema_name=table['schema'],
-            table_name=table['table']
+            schema=schema,
+            table=table
         )
 
     def save_data_as_hyper(self, file_path: str, table: str = 'Extract', schema: str = 'Extract', minimise=False):
