@@ -236,7 +236,7 @@ def drop_columns_from_hyper(hyper_file_path, columns_to_drop=None, columns_to_ke
 
                 # Rename the new table to the old table name
                 connection.execute_command(
-                    f"ALTER TABLE \"{schema}\".\"{table}_new\" RENAME TO \"{schema}\".\"{table}\"")
+                    f"ALTER TABLE \"{schema}\".\"{table}_new\" RENAME TO \"{table}\"")
 
 
 def create_random_sample(hyper_file_path, sample_size, schema='public', table='default'):
@@ -255,7 +255,7 @@ def create_random_sample(hyper_file_path, sample_size, schema='public', table='d
             """)
 
             connection.execute_command(f"DROP TABLE \"{schema}\".\"{table}\"")
-            connection.execute_command(f"ALTER TABLE random_sample RENAME TO \"{schema}\".\"{table}\"")
+            connection.execute_command(f"ALTER TABLE random_sample RENAME TO \"{table}\"")
 
 
 def concatenate_hypers(hyper_file_path1, hyper_file_path2, output_hyper_file_path, schema='public', table='default'):
