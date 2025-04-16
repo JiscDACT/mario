@@ -156,16 +156,21 @@ class DataExtractor:
             self.__minimise_data__()
         return self._data
 
-    def save_query(self, file_path: str):
+    def save_query(self, file_path: str, formatted: bool = False):
         """
         Output the query used
         :param file_path:
+        :param formatted: whether to format parameters inline; defaults to False
         :return:
         """
+        from mario.query_builder import get_formatted_query
         if self._query is None:
             self.__build_query__()
+        sql = self._query[0]
+        if formatted:
+            sql = get_formatted_query(self._query[0], self._query[1])
         with open(file_path, mode='w') as file:
-            file.write(self._query[0])
+            file.write(sql)
 
     def save_data_as_csv(self, file_path: str, minimise=True):
         if self._data is None:
