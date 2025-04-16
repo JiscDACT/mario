@@ -261,6 +261,10 @@ class StreamingDataExtractor(DataExtractor):
 
     def get_connection(self):
         from sqlalchemy import create_engine
+
+        if self.configuration.hook is not None:
+            return self.configuration.hook.get_conn()
+
         engine = create_engine(self.configuration.connection_string)
         connection = engine.connect().execution_options(stream_results=True)
         return connection
