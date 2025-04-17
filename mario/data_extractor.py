@@ -222,10 +222,54 @@ class HyperFile(DataExtractor):
             table=table
         )
 
+    def get_total(self, measure=None):
+        from mario.hyper_utils import get_row_count, get_default_table_and_schema
+        schema, table = get_default_table_and_schema(self.configuration.file_path)
+        return get_row_count(
+            hyper_file_path=self.configuration.file_path,
+            schema=schema,
+            table=table
+        )
+
     def save_data_as_hyper(self, file_path: str, table: str = 'Extract', schema: str = 'Extract', minimise=False):
         if minimise:
             self.__minimise_data__()
         shutil.copyfile(self.configuration.file_path, file_path)
+
+    def save_data_as_csv(self,
+                         file_path: str,
+                         minimise=True,
+                         compress_using_gzip=False,
+                         chunk_size=100000
+                         ):
+        from mario.hyper_utils import get_default_table_and_schema
+        import pantab
+
+        if compress_using_gzip:
+            compression_options = dict(method='gzip')
+            file_path = file_path + '.gz'
+        elif file_path.endswith('.gz'):
+            compression_options = dict(method='gzip')
+        else:
+            compression_options = None
+
+        mode = 'w'
+        header = True
+        offset = 0
+        schema, table = get_default_table_and_schema(self.configuration.file_path)
+        sql = f"SELECT * FROM \"{schema}\".\"{table}\""
+
+        while True:
+            query = f"{sql} LIMIT {chunk_size} OFFSET {offset}"
+            df_chunk = pantab.frame_from_hyper_query(self.configuration.file_path, query)
+            if df_chunk.empty:
+                break
+            df_chunk.to_csv(file_path, index=False, mode=mode, header=header,
+                            compression=compression_options)
+            offset += chunk_size
+            if header:
+                header = False
+                mode = "a"
 
 
 class StreamingDataExtractor(DataExtractor):
