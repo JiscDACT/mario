@@ -6,7 +6,8 @@ import logging
 import pandas as pd
 import pytest
 
-from mario.data_extractor import DataExtractor, Configuration, StreamingDataExtractor, DataFrameExtractor, PartitioningExtractor
+from mario.data_extractor import DataExtractor, Configuration, StreamingDataExtractor, DataFrameExtractor, \
+    PartitioningExtractor
 from mario.dataset_specification import dataset_from_json, Constraint
 from mario.metadata import metadata_from_json
 from mario.query_builder import ViewBasedQueryBuilder, SubsetQueryBuilder
@@ -466,11 +467,12 @@ def test_partitioning_extractor():
         partition_column='City'
     )
     extractor.__load_from_sql_using_partition__(partition_value='Houston')
-    df = extractor.get_data_frame()
+    df = extractor._data
     assert len(df) == 377
 
     extractor._data = None
-    df = extractor.get_data_frame()
+    extractor.__load_from_sql__()
+    df = extractor._data
     assert df['City'].nunique() == 3
 
 
