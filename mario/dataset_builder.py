@@ -89,7 +89,7 @@ class DatasetBuilder:
 
     def __build_excel_pivot__(self, file_path: str, template_path: str):
         from mario.excel_builder import ExcelBuilder
-        if len(self.data.get_data_frame()) > 1000000:
+        if self.data.get_total() > 1000000:
             logger.warning("The dataset is larger than 1m rows; this isn't supported in Excel format")
         excel_builder = ExcelBuilder(
             output_file_path=file_path,
