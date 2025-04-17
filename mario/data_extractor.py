@@ -450,3 +450,172 @@ class DataFrameExtractor(DataExtractor):
                  ):
         super().__init__(configuration=Configuration(), dataset_specification=dataset_specification, metadata=metadata)
         self._data = dataframe
+
+
+class PartitioningExtractor(DataExtractor):
+    """
+    A data extractor that loads from SQL in batches using a specified constraint
+    to partition by
+    """
+    def __init__(self,
+                 configuration: Configuration,
+                 dataset_specification: DatasetSpecification,
+                 metadata: Metadata,
+                 partition_column: str
+                 ):
+        super().__init__(configuration, dataset_specification, metadata)
+        self._data = None
+        self.partition_column = partition_column
+
+    def get_connection(self):
+        from sqlalchemy import create_engine
+
+        if self.configuration.hook is not None:
+            return self.configuration.hook.get_conn()
+
+        engine = create_engine(self.configuration.connection_string)
+        connection = engine.connect().execution_options(stream_results=True)
+        return connection
+
+    def __get_partition_values__(self):
+        for constraint in self.dataset_specification.constraints:
+            if constraint.item == self.partition_column:
+                return constraint.allowed_values
+
+    def __build_query_using_partition__(self, partition_value):
+        logger.info(f"Building query for partition {self.partition_column} with value {partition_value}")
+        from copy import deepcopy
+        specification = deepcopy(self.dataset_specification)
+
+        partition_found = False
+        for constraint in specification.constraints:
+            if constraint.item == self.partition_column:
+                constraint.allowed_values = [partition_value]
+                partition_found = True
+
+        if not partition_found:
+            raise ValueError("Partition not found in constraints")
+
+        if self.configuration.query_builder is not None:
+            from mario.query_builder import QueryBuilder
+            query_builder: QueryBuilder = self.configuration.query_builder(
+                configuration=self.configuration,
+                metadata=self.metadata,
+                dataset_specification=specification)
+            query = query_builder.create_query()
+        else:
+            raise NotImplementedError
+
+        return query
+
+    def __load_from_sql_using_partition__(self, partition_value):
+        logger.info("Executing query")
+
+        query = self.__build_query_using_partition__(partition_value=partition_value)
+        from sqlalchemy import create_engine
+        engine = create_engine(self.configuration.connection_string)
+        if self._data is None:
+            self._data = pd.read_sql(sql=query[0], con=engine.connect(), params=query[1])
+        else:
+            df = pd.read_sql(sql=query[0], con=engine.connect(), params=query[1])
+            self._data = pd.concat([self._data, df], axis=0)
+
+    def __load_from_sql__(self):
+        for value in self.__get_partition_values__():
+            self.__load_from_sql_using_partition__(partition_value=value)
+
+    def get_data_frame(self, minimise=True) -> DataFrame:
+        raise NotImplementedError()
+
+    def get_total(self, measure=None):
+        raise NotImplementedError()
+
+    def save_data_as_hyper(self,
+                           file_path: str,
+                           table: str = 'Extract',
+                           schema: str = 'Extract',
+                           minimise=True):
+        self.stream_sql_to_hyper(file_path=file_path, table=table, schema=schema, minimise=minimise)
+
+    def save_data_as_csv(self, file_path: str, minimise=True):
+        self.stream_sql_to_csv(
+            file_path=file_path,
+            minimise=minimise
+        )
+
+    def stream_sql_to_csv(self,
+                          file_path,
+                          validate: bool = False,
+                          allow_nulls: bool = True,
+                          chunk_size: int = 100000,
+                          compress_using_gzip: bool = False,
+                          minimise: bool = False
+                          ):
+        """
+        Write From SQL to CSV using streaming. No data is held in memory
+        apart from chunks of rows as they are read.
+        Optionally, data can be validated as it is read.
+        """
+        from mario.query_builder import get_formatted_query
+        logger.info("Executing query")
+        connection = self.get_connection()
+
+        if compress_using_gzip:
+            compression_options = dict(method='gzip')
+            file_path = file_path + '.gz'
+        else:
+            compression_options = None
+
+        mode = 'w'
+        header = True
+        for partition_value in self.__get_partition_values__():
+            query = self.__build_query_using_partition__(partition_value=partition_value)
+            for df in pd.read_sql(get_formatted_query(query[0],query[1]), connection, chunksize=chunk_size):
+                if validate or minimise:
+                    self._data = df
+                    if validate:
+                        self.validate_data(allow_nulls=allow_nulls)
+                    if minimise:
+                        self.__minimise_data__()
+                        df = self._data
+                df.to_csv(file_path, mode=mode, header=header, index=False, compression=compression_options)
+                if header:
+                    header = False
+                    mode = "a"
+
+        return file_path
+
+    def stream_sql_to_hyper(self,
+                            file_path: str,
+                            table: str = 'Extract',
+                            schema: str = 'Extract',
+                            validate: bool = False,
+                            allow_nulls: bool = True,
+                            minimise: bool = False,
+                            chunk_size: int = 100000):
+        """
+        Write From SQL to .hyper using streaming. No data is held in memory
+        apart from chunks of rows as they are read.
+        Optionally, data can be validated as it is read.
+        """
+        self.__build_query__()
+        logger.info("Executing query")
+        from tableauhyperapi import TableName
+        from pantab import frame_to_hyper
+        from mario.query_builder import get_formatted_query
+
+        connection = self.get_connection()
+        table_name = TableName(schema, table)
+        for partition_value in self.__get_partition_values__():
+            query = self.__build_query_using_partition__(partition_value=partition_value)
+            for df in pd.read_sql(get_formatted_query(query[0], query[1]), connection, chunksize=chunk_size):
+                if validate or minimise:
+                    self._data = df
+                    if validate:
+                        self.validate_data(allow_nulls=allow_nulls)
+                    if minimise:
+                        self.__minimise_data__()
+                        df = self._data
+                frame_to_hyper(df, database=file_path, table=table_name, table_mode='a')
+
+

@@ -6,8 +6,8 @@ import logging
 import pandas as pd
 import pytest
 
-from mario.data_extractor import DataExtractor, Configuration, StreamingDataExtractor, DataFrameExtractor
-from mario.dataset_specification import dataset_from_json
+from mario.data_extractor import DataExtractor, Configuration, StreamingDataExtractor, DataFrameExtractor, PartitioningExtractor
+from mario.dataset_specification import dataset_from_json, Constraint
 from mario.metadata import metadata_from_json
 from mario.query_builder import ViewBasedQueryBuilder, SubsetQueryBuilder
 
@@ -440,3 +440,78 @@ def test_dataframe_extractor():
     )
     assert extractor.validate_data()
     assert extractor.get_total() == 2326534.3543
+
+
+def test_partitioning_extractor():
+    # Skip this test if we don't have a connection string
+    if not os.environ.get('CONNECTION_STRING'):
+        pytest.skip("Skipping SQL test as no database configured")
+
+    dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
+    constraint = Constraint()
+    constraint.item = 'City'
+    constraint.allowed_values = ['Houston', 'Laredo', 'Springfield']
+    dataset.constraints.append(constraint)
+    metadata = metadata_from_json(os.path.join('test', 'metadata.json'))
+    configuration = Configuration(
+        connection_string=os.environ.get('CONNECTION_STRING'),
+        schema="dev",
+        view="superstore",
+        query_builder=SubsetQueryBuilder
+    )
+    extractor = PartitioningExtractor(
+        configuration=configuration,
+        dataset_specification=dataset,
+        metadata=metadata,
+        partition_column='City'
+    )
+    extractor.__load_from_sql_using_partition__(partition_value='Houston')
+    df = extractor.get_data_frame()
+    assert len(df) == 377
+
+    extractor._data = None
+    df = extractor.get_data_frame()
+    assert df['City'].nunique() == 3
+
+
+def test_partitioning_extractor_streaming():
+    # Skip this test if we don't have a connection string
+    if not os.environ.get('CONNECTION_STRING'):
+        pytest.skip("Skipping SQL test as no database configured")
+
+    dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
+    constraint = Constraint()
+    constraint.item = 'City'
+    constraint.allowed_values = ['Houston', 'Laredo', 'Springfield']
+    dataset.constraints.append(constraint)
+    metadata = metadata_from_json(os.path.join('test', 'metadata.json'))
+    configuration = Configuration(
+        connection_string=os.environ.get('CONNECTION_STRING'),
+        schema="dev",
+        view="superstore",
+        query_builder=SubsetQueryBuilder
+    )
+    extractor = PartitioningExtractor(
+        configuration=configuration,
+        dataset_specification=dataset,
+        metadata=metadata,
+        partition_column='City'
+    )
+
+    path = os.path.join('output', 'test_partitioning_extractor_streaming')
+    file = os.path.join(path, 'test.hyper')
+    csv_file = os.path.join(path, 'test.csv')
+
+    os.makedirs(path, exist_ok=True)
+
+    extractor.stream_sql_to_hyper(
+        file_path=file,
+    )
+    extractor.stream_sql_to_csv(
+        file_path=csv_file,
+        compress_using_gzip=True
+    )
+
+
+
+
