@@ -172,7 +172,7 @@ class DataExtractor:
         with open(file_path, mode='w') as file:
             file.write(sql)
 
-    def save_data_as_csv(self, file_path: str, minimise=True):
+    def save_data_as_csv(self, file_path: str, minimise=True, compress_using_gzip=False):
         if self._data is None:
             self.__load__()
         if minimise:
@@ -313,10 +313,10 @@ class StreamingDataExtractor(DataExtractor):
         connection = engine.connect().execution_options(stream_results=True)
         return connection
 
-    def save_data_as_csv(self, file_path: str, minimise=False):
+    def save_data_as_csv(self, file_path: str, minimise=False, compress_using_gzip=False):
         if minimise:
             raise NotImplementedError('Cannot minimise data when using streaming')
-        self.stream_sql_to_csv(file_path=file_path)
+        self.stream_sql_to_csv(file_path=file_path, compress_using_gzip=compress_using_gzip)
 
     def save_data_as_hyper(self, file_path: str, table: str = 'Extract', schema: str = 'Extract', minimise=False):
         if minimise:
@@ -581,10 +581,11 @@ class PartitioningExtractor(DataExtractor):
                            minimise=True):
         self.stream_sql_to_hyper(file_path=file_path, table=table, schema=schema, minimise=minimise)
 
-    def save_data_as_csv(self, file_path: str, minimise=True):
+    def save_data_as_csv(self, file_path: str, minimise=True, compress_using_gzip=False):
         self.stream_sql_to_csv(
             file_path=file_path,
-            minimise=minimise
+            minimise=minimise,
+            compress_using_gzip=compress_using_gzip
         )
 
     def stream_sql_to_csv(self,
@@ -660,6 +661,7 @@ class PartitioningExtractor(DataExtractor):
                     if minimise:
                         self.__minimise_data__()
                         df = self._data
+                logger.info(f"Saving {chunk_size} rows to file")
                 frame_to_hyper(df, database=file_path, table=table_name, table_mode='a')
 
 

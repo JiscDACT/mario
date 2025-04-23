@@ -232,3 +232,25 @@ def test_hyper_with_csv_output():
     builder.build(Format.TABLEAU_PACKAGED_DATASOURCE, file_path=os.path.join(folder, 'test.tdsx'))
     builder.build(Format.EXCEL_PIVOT, file_path=os.path.join(folder, 'test.xlsx'))
 
+
+def test_hyper_with_compressed_csv_output():
+    folder = os.path.join('output', 'test_integration_hyper_with_csv_output')
+    os.makedirs(folder, exist_ok=True)
+    dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
+    metadata = metadata_from_json(os.path.join('test', 'metadata.json'))
+    configuration = Configuration(
+        file_path=os.path.join('test', 'orders.hyper')
+    )
+    extractor = HyperFile(
+        dataset_specification=dataset,
+        metadata=metadata,
+        configuration=configuration
+    )
+    builder = DatasetBuilder(
+        dataset_specification=dataset,
+        metadata=metadata,
+        data=extractor
+    )
+    builder.build(Format.CSV, file_path=os.path.join(folder, 'test.csv'))
+    builder.data.save_data_as_csv(file_path=os.path.join(folder, 'test.csv'), compress_using_gzip=True)
+    assert os.path.exists(os.path.join(folder, 'test.csv.gz'))

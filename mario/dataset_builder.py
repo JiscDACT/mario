@@ -100,9 +100,9 @@ class DatasetBuilder:
         )
         excel_builder.create_workbook()
 
-    def __build_csv__(self, file_path: str):
+    def __build_csv__(self, file_path: str, compress_using_gzip=False):
         # TODO export Info sheet as well - see code in Automation2.0 and TDSA.
-        self.data.save_data_as_csv(file_path=file_path)
+        self.data.save_data_as_csv(file_path=file_path, compress_using_gzip=compress_using_gzip)
 
     def __build_tdsx__(self, file_path: str):
         from mario.hyper_utils import get_default_table_and_schema
