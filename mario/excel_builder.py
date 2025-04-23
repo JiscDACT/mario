@@ -48,7 +48,7 @@ class ExcelBuilder(object):
         self.total = 0
         logger.debug("Excel handler initialised")
 
-    def create_workbook(self):
+    def create_workbook(self, create_notes_page=False):
         """
         Creates a write-only workbook and builds
         content in streaming mode to conserve memory
@@ -56,7 +56,8 @@ class ExcelBuilder(object):
         template_workbook = load_workbook(self.template)
         template_workbook.save(self.filepath)
 
-        self.__create_notes_page__()
+        if create_notes_page:
+            self.__create_notes_page__()
         self.__create_data_page__()
         self.__create_pivot_page__()
         logger.debug("Completed workbook")
