@@ -1,0 +1,1 @@
+This file should be present in each 'split' directory

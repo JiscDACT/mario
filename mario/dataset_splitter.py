@@ -63,6 +63,15 @@ class DatasetSplitter:
         if split_files_count == 0:
             raise ValueError("No files were split")
 
+
+    def copy_other_file(self, file):
+        logger.info(f"Copying file {file} to output directory")
+        for output_directory in os.listdir(self.output_path):
+            if os.path.isdir(os.path.join(self.output_path, output_directory)):
+                shutil.copyfile(
+                    os.path.join(self.source_path, file),
+                    os.path.join(self.output_path, output_directory, file))
+
     def copy_other_files(self) -> None:
         """
         Iterates over the source folder, and copies each non-data file into
@@ -71,12 +80,7 @@ class DatasetSplitter:
         """
         for file in os.listdir(self.source_path):
             if not file.endswith('.xlsx') and not file.endswith('.csv'):
-                logger.info(f"Copying file {file} to output directory")
-                for output_directory in os.listdir(self.output_path):
-                    if os.path.isdir(os.path.join(self.output_path, output_directory)):
-                        shutil.copyfile(
-                            os.path.join(self.source_path, file),
-                            os.path.join(self.output_path, output_directory, file))
+                self.copy_other_file(file)
 
     def process_batch(self, batch, column_name, file_handles, file_name):
         for row in batch:
@@ -120,7 +124,7 @@ class DatasetSplitter:
         for handle in file_handles.values():
             handle.close()
 
-    def split_excel(self, file_name: str, batch_size=10000):
+    def split_excel(self, file_name: str):
         import pandas as pd
         from openpyxl import load_workbook
 
@@ -128,7 +132,12 @@ class DatasetSplitter:
         sheet_names = pd.ExcelFile(file_path).sheet_names
 
         # Get the values
-        values = get_unique_values_for_workbook(file_path=file_path, field=self.field)
+        try:
+            values = get_unique_values_for_workbook(file_path=file_path, field=self.field)
+        except ValueError:
+            logger.warning("Encountered an Excel file with no data; treating as an 'other' file")
+            self.copy_other_file(file=file_name)
+            return None
 
         # Create split workbooks
         for value in values:

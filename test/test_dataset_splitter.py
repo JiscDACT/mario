@@ -133,3 +133,17 @@ def test_dataset_splitter_pivot():
     assert len(os.listdir(os.path.join('output', 'test_dataset_splitter_pivot'))) == 3
 
 
+def test_dataset_splitter_info():
+
+    dataset_splitter = DatasetSplitter(
+        field='Category',
+        source_path=os.path.join('test', 'test_split_with_info'),
+        output_path=os.path.join('output', 'test_dataset_splitter_info')
+    )
+    dataset_splitter.split_files()
+    dataset_splitter.copy_other_files()
+    assert 'Furniture' in os.listdir(os.path.join('output', 'test_dataset_splitter_info'))
+    assert len(os.listdir(os.path.join('output', 'test_dataset_splitter_info'))) == 4
+
+
+
