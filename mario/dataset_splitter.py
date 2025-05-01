@@ -60,9 +60,11 @@ class DatasetSplitter:
                 elif file.endswith('.csv'):
                     self.split_csv(file)
                     split_files_count += 1
+                elif file.endswith('.csv.gz'):
+                    self.split_gzipped_csv(file)
+                    split_files_count += 1
         if split_files_count == 0:
             raise ValueError("No files were split")
-
 
     def copy_other_file(self, file):
         logger.info(f"Copying file {file} to output directory")
@@ -79,7 +81,7 @@ class DatasetSplitter:
         :return: None
         """
         for file in os.listdir(self.source_path):
-            if not file.endswith('.xlsx') and not file.endswith('.csv'):
+            if not file.endswith('.xlsx') and not file.endswith('.csv') and not file.endswith('.csv.gz'):
                 self.copy_other_file(file)
 
     def process_batch(self, batch, column_name, file_handles, file_name):
@@ -94,7 +96,39 @@ class DatasetSplitter:
             writer = csv.DictWriter(file_handles[value], fieldnames=row.keys())
             writer.writerow(row)
 
-    def split_csv(self, file_name: str, batch_size=10000):
+    def split_gzipped_csv(self, file_name: str, batch_size=10000):
+        import gzip
+
+        logger.info(f"Splitting gzipped CSV file {file_name}")
+
+        # Dict for holding open file handles
+        file_handles = {}
+
+        # Path to the CSV to split
+        file_path = os.path.join(self.source_path, file_name)
+
+        output_file_name = file_name.rstrip('.gz')
+
+        with gzip.open(file_path, 'rt', newline='') as infile:
+            reader = csv.DictReader(infile)
+
+            # Process the input file in batches
+            batch = []
+            for row in reader:
+                batch.append(row)
+                if len(batch) >= batch_size:
+                    self.process_batch(batch, self.field, file_handles, output_file_name)
+                    batch = []
+
+            # Process any remaining rows in the last batch
+            if batch:
+                self.process_batch(batch, self.field, file_handles, output_file_name)
+
+        # Close all open file handles
+        for handle in file_handles.values():
+            handle.close()
+
+    def split_csv(self, file_name: str, batch_size=10000, compression=None):
 
         logger.info(f"Splitting CSV file {file_name}")
 

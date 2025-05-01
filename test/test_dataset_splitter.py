@@ -143,7 +143,19 @@ def test_dataset_splitter_info():
     dataset_splitter.split_files()
     dataset_splitter.copy_other_files()
     assert 'Furniture' in os.listdir(os.path.join('output', 'test_dataset_splitter_info'))
-    assert len(os.listdir(os.path.join('output', 'test_dataset_splitter_info'))) == 4
+    assert len(os.listdir(os.path.join('output', 'test_dataset_splitter_info'))) == 3
 
+
+def test_dataset_splitter_gz():
+
+    dataset_splitter = DatasetSplitter(
+        field='Category',
+        source_path=os.path.join('test', 'test_split_gz'),
+        output_path=os.path.join('output', 'test_dataset_splitter_gz')
+    )
+    dataset_splitter.split_files()
+    dataset_splitter.copy_other_files()
+    assert 'Furniture' in os.listdir(os.path.join('output', 'test_dataset_splitter_gz'))
+    assert len(os.listdir(os.path.join('output', 'test_dataset_splitter_gz'))) == 3
 
 
