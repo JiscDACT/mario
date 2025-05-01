@@ -19,6 +19,7 @@ class DatasetSplitter:
         self.field = field
         self.source_path = source_path
         self.output_path = output_path
+        self.other_files = []
 
         # If the source path doesn't exist, raise an error
         if not os.path.exists(self.source_path):
@@ -82,7 +83,9 @@ class DatasetSplitter:
         """
         for file in os.listdir(self.source_path):
             if not file.endswith('.xlsx') and not file.endswith('.csv') and not file.endswith('.csv.gz'):
-                self.copy_other_file(file)
+                self.other_files.append(file)
+        for file in self.other_files:
+            self.copy_other_file(file)
 
     def process_batch(self, batch, column_name, file_handles, file_name):
         for row in batch:
@@ -170,7 +173,7 @@ class DatasetSplitter:
             values = get_unique_values_for_workbook(file_path=file_path, field=self.field)
         except ValueError:
             logger.warning("Encountered an Excel file with no data; treating as an 'other' file")
-            self.copy_other_file(file=file_name)
+            self.other_files.append(file_name)
             return None
 
         # Create split workbooks
