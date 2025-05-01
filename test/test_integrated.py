@@ -43,6 +43,21 @@ def test_integration_excel():
     builder.build(file_path=path, output_format=Format.EXCEL_PIVOT, template_path='excel_template.xlsx')
 
 
+def test_integration_excel_no_notes():
+    from openpyxl import load_workbook
+    dataset = dataset_from_manifest(os.path.join('test', 'manifest_superstore.json'))
+    metadata = metadata_from_manifest(os.path.join('test', 'manifest_superstore.json'))
+    configuration = Configuration(file_path=os.path.join('test', 'orders.hyper'))
+    extractor = DataExtractor(configuration=configuration, dataset_specification=dataset, metadata=metadata)
+    builder = DatasetBuilder(dataset_specification=dataset, metadata=metadata, data=extractor)
+    path = os.path.join('output', 'test_integration_excel_no_notes', 'data.xlsx')
+    os.makedirs(os.path.join('output', 'test_integration_excel_no_notes'), exist_ok=True)
+    builder.build(file_path=path, output_format=Format.EXCEL_PIVOT, template_path='excel_template.xlsx')
+
+    workbook = load_workbook(filename=path)
+    assert 'Notes' not in workbook.sheetnames
+
+
 def test_integration_excel_info_only():
     dataset = dataset_from_manifest(os.path.join('test', 'manifest_superstore.json'))
     metadata = metadata_from_manifest(os.path.join('test', 'manifest_superstore.json'))

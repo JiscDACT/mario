@@ -58,6 +58,8 @@ class ExcelBuilder(object):
 
         if create_notes_page:
             self.__create_notes_page__()
+        else:
+            self.__delete_notes_page__()
         self.__create_data_page__()
         self.__create_pivot_page__()
 
@@ -107,6 +109,12 @@ class ExcelBuilder(object):
         notes = workbook.get_sheet_by_name('Notes')
         self.__update_notes__(notes)
         workbook.save(self.filepath)
+
+    def __delete_notes_page__(self):
+        workbook = load_workbook(self.filepath)
+        if 'Notes' in workbook.sheetnames:
+            workbook.remove(workbook['Notes'])
+            workbook.save(self.filepath)
 
     def __create_pivot_page__(self):
         workbook = load_workbook(self.filepath)
