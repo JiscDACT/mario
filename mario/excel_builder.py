@@ -60,6 +60,14 @@ class ExcelBuilder(object):
             self.__create_notes_page__()
         self.__create_data_page__()
         self.__create_pivot_page__()
+
+        # Set active sheet
+        workbook = load_workbook(self.filepath)
+        for sheet in workbook:
+            workbook[sheet.title].views.sheetView[0].tabSelected = False
+        workbook.save(self.filepath)
+        workbook.close()
+
         logger.debug("Completed workbook")
 
     def __format_cell__(self, cell, new_cell):
