@@ -6,6 +6,10 @@ import shutil
 import csv
 import logging
 
+from openpyxl import Workbook
+
+from mario.excel_pivot_utils import get_unique_values_for_workbook
+
 logger = logging.getLogger(__name__)
 
 
@@ -116,101 +120,78 @@ class DatasetSplitter:
         for handle in file_handles.values():
             handle.close()
 
-    def split_excel_pivot(self, file_name: str, file_path: str, sheet_name: str):
-        from mario.excel_pivot_utils import get_unique_values, replace_pivot_cache_with_subset
-        from openpyxl import load_workbook
-
-        # Get the values to split by
-        values = get_unique_values(file_path=file_path, sheet_name=sheet_name, field=self.field)
-
-        for value in values:
-            # Copy workbook
-            os.makedirs(os.path.join(self.output_path, value), exist_ok=True)
-            shutil.copyfile(
-                os.path.join(self.source_path, file_name),
-                self.get_output_path(file_name, value)
-            )
-
-            # Load the split workbook
-            wb = load_workbook(self.get_output_path(file_name, value))
-            ws = wb[sheet_name]
-            for pivot in ws._pivots:
-                pivot.cache.refreshOnLoad = True
-            wb.save(self.get_output_path(file_name, value))
-
-            # Filter the data in the cache
-            replace_pivot_cache_with_subset(ws, self.field, value)
-
-            wb.save(self.get_output_path(file_name, value))
-
     def split_excel(self, file_name: str, batch_size=10000):
         import pandas as pd
         from openpyxl import load_workbook
 
         file_path = os.path.join(self.source_path, file_name)
-        sheet_names = pd.ExcelFile(file_path, engine='openpyxl').sheet_names
-        original_wb = load_workbook(file_path, data_only=True)
-        pivot = False
-        pivot_sheet_name = None
-        for sheet_name in sheet_names:
-            ws = original_wb[sheet_name]
-            if len(ws._pivots) > 0:
-                pivot = True
-                pivot_sheet_name = sheet_name
-                break
+        sheet_names = pd.ExcelFile(file_path).sheet_names
 
-        if pivot:
-            logger.info(f"Splitting excel pivot {file_name}")
-            self.split_excel_pivot(file_name=file_name, file_path=file_path, sheet_name=pivot_sheet_name)
-        else:
-            workbook_handles = {}
+        # Get the values
+        values = get_unique_values_for_workbook(file_path=file_path, field=self.field)
+
+        # Create split workbooks
+        for value in values:
+            logger.info(f"Splitting for value {value}")
+            split_output_path = os.path.join(self.output_path, str(value))
+            split_workbook_path = os.path.join(split_output_path, file_name)
+            os.makedirs(split_output_path, exist_ok=True)
+            shutil.copyfile(src=file_path, dst=split_workbook_path)
+
             for sheet_name in sheet_names:
-                logger.info(f"Splitting excel file without pivots {file_path}")
-                self.split_excel_table(file_path=file_path, sheet_name=sheet_name, workbook_handles=workbook_handles,
-                                       batch_size=batch_size)
-                for value, wb in workbook_handles.items():
-                    if value is not None:
-                        os.makedirs(os.path.join(self.output_path, value), exist_ok=True)
-                        output_file_path = self.get_output_path(field_value=value, file=file_name)
-                        wb.save(output_file_path)
+                workbook: Workbook = load_workbook(split_workbook_path)
+                if len(workbook.get_sheet_by_name(sheet_name)._pivots) > 0:
+                    logger.info(f"Splitting excel pivot")
+                    self.split_excel_pivot(
+                        workbook=workbook,
+                        file_path=split_workbook_path,
+                        sheet_name=sheet_name,
+                        value=value
+                    )
+                else:
+                    logger.info(f"Splitting excel sheet")
+                    self.split_excel_table(
+                        workbook=workbook,
+                        file_path=split_workbook_path,
+                        sheet_name=sheet_name,
+                        value=value
+                    )
+                workbook.close()
 
-    def split_excel_table(self, file_path: str, sheet_name: str, workbook_handles, batch_size=10000):
-        import pandas as pd
-        from openpyxl import Workbook
-        from openpyxl.utils.dataframe import dataframe_to_rows
+            # Set active sheet
+            workbook: Workbook = load_workbook(split_workbook_path)
+            for sheet in workbook:
+                workbook[sheet.title].views.sheetView[0].tabSelected = False
+            workbook.save(split_workbook_path)
+            workbook.close()
 
-        # Read the header separately
-        header = pd.read_excel(file_path, sheet_name=sheet_name, nrows=0).columns.tolist()
+    def split_excel_pivot(self, workbook, file_path: str, sheet_name: str, value: str):
+        from mario.excel_pivot_utils import replace_pivot_cache_with_subset
+        ws = workbook[sheet_name]
+        replace_pivot_cache_with_subset(ws, self.field, value)
+        workbook.save(file_path)
 
-        # Get the total number of rows in the sheet
-        total_rows = pd.read_excel(file_path, sheet_name=sheet_name).shape[0]
+    def split_excel_table(self, workbook: Workbook, file_path: str, sheet_name: str, value):
 
-        # Read the sheet in chunks
-        for start_row in range(0, total_rows, batch_size):
-            chunk = pd.read_excel(file_path, sheet_name=sheet_name, skiprows=range(1, start_row + 1),
-                                  nrows=batch_size, header=None, names=header)
-            for row in dataframe_to_rows(chunk, index=False, header=False):
+        ws = workbook[sheet_name]
+        header = [cell.value for cell in ws[1]]  # Read header row
 
-                # Skip if this is a sheet without the field present as a column
-                # Usually this is a notes page, chart or similar
-                if self.field not in chunk.columns:
-                    continue
+        if self.field not in header:
+            return None
 
-                value = row[chunk.columns.get_loc(self.field)]
+        # Create a new sheet for filtered data
+        workbook.create_sheet(title=f"{sheet_name}_filtered")
+        new_ws = workbook[f"{sheet_name}_filtered"]
+        new_ws.append(header)
 
-                # Don't include a header row
-                if self.field == value:
-                    continue
+        # Read rows efficiently
+        field_index = header.index(self.field)
 
-                # If we don't already have a workbook for this value, we
-                # create one and populate it
-                if value not in workbook_handles:
-                    workbook_handles[value] = Workbook()
-                    # Remove the default sheet created by Workbook()
-                    default_sheet = workbook_handles[value].active
-                    workbook_handles[value].remove(default_sheet)
-                if sheet_name not in workbook_handles[value].sheetnames:
-                    ws = workbook_handles[value].create_sheet(title=sheet_name)
-                    ws.append(header)  # Write header
-                ws = workbook_handles[value][sheet_name]
-                ws.append(row)
+        for row in ws.iter_rows(min_row=2, values_only=True):
+            if row[field_index] == value:
+                new_ws.append(row)
+
+        # Save and remove original sheet
+        workbook.remove(ws)
+        new_ws.title = sheet_name
+        workbook.save(file_path)

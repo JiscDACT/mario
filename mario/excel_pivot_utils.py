@@ -1,4 +1,6 @@
 from typing import List
+from openpyxl import Workbook
+import pandas as pd
 
 
 def replace_pivot_cache_with_subset(worksheet, field, value) -> None:
@@ -59,17 +61,8 @@ def get_subset(pivot_cache, field_name, field_value):
     return filtered_records
 
 
-def get_unique_values(file_path, sheet_name, field) -> List[str]:
-    """
-    Returns all the unique values for a column in a pivot cache
-    :param file_path: the workbook file path
-    :param sheet_name: the name of the sheet
-    :param field: the field to get values for
-    :return: a list of unique values for the specified column in the cache
-    """
-    from openpyxl import load_workbook
-    wb = load_workbook(file_path, data_only=True)
-    ws = wb[sheet_name]
+def get_unique_values_in_worksheet(workbook, sheet_name, field) -> List[str]:
+    ws = workbook[sheet_name]
     pivot = ws._pivots[0]
     cached_data = pivot.cache
 
@@ -93,4 +86,41 @@ def get_unique_values(file_path, sheet_name, field) -> List[str]:
     # Use a set to get unique values
     unique_values = set(items)
     return list(unique_values)
+
+
+def get_unique_values(file_path, sheet_name, field) -> List[str]:
+    """
+    Returns all the unique values for a column in a pivot cache
+    :param file_path: the workbook file path
+    :param sheet_name: the name of the sheet
+    :param field: the field to get values for
+    :return: a list of unique values for the specified column in the cache
+    """
+    from openpyxl import load_workbook
+    wb = load_workbook(file_path, data_only=True)
+    return get_unique_values_in_worksheet(workbook=wb, sheet_name=sheet_name, field=field)
+
+
+def get_header(file_path: str, sheet_name: str):
+    header: List[str] = pd.read_excel(file_path, sheet_name=sheet_name, nrows=0).columns.tolist()
+    return header
+
+
+def sheet_contains_column_name(file_path: str, sheet_name: str, field: str):
+    return field in get_header(file_path=file_path, sheet_name=sheet_name)
+
+
+def get_unique_values_for_workbook(file_path, field):
+    from openpyxl import load_workbook
+    wb: Workbook = load_workbook(file_path, data_only=True)
+    for sheet in wb.sheetnames:
+        ws = wb[sheet]
+        if len(ws._pivots) > 0:
+            return get_unique_values_in_worksheet(workbook=wb, sheet_name=sheet, field=field)
+        else:
+            if sheet_contains_column_name(file_path=file_path, sheet_name=sheet, field=field):
+                return pd.read_excel(file_path, sheet_name=sheet, dtype={field: object}, usecols=[field])[field].unique().tolist()
+    raise ValueError("No valid worksheet containing field values")
+
+
 
