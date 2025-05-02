@@ -83,6 +83,14 @@ def get_table(hyper_path: str, schema='public', table='default'):
     return table
 
 
+def get_total(hyper_file_path: str, schema='public', table='default', measure='FPE'):
+    from tableauhyperapi import HyperProcess, Telemetry, Connection
+    with HyperProcess(telemetry=Telemetry.SEND_USAGE_DATA_TO_TABLEAU) as hyper:
+        with Connection(endpoint=hyper.endpoint, database=hyper_file_path) as connection:
+            total = connection.execute_scalar_query(f"SELECT SUM(\"{measure}\") FROM \"{schema}\".\"{table}\"")
+    return total
+
+
 def get_row_count(hyper_file_path: str, schema='public', table='default'):
     from tableauhyperapi import HyperProcess, Telemetry, Connection
     with HyperProcess(telemetry=Telemetry.SEND_USAGE_DATA_TO_TABLEAU) as hyper:

@@ -7,7 +7,7 @@ import pandas as pd
 import pytest
 
 from mario.data_extractor import DataExtractor, Configuration, StreamingDataExtractor, DataFrameExtractor, \
-    PartitioningExtractor
+    PartitioningExtractor, HyperFile
 from mario.dataset_specification import dataset_from_json, Constraint
 from mario.metadata import metadata_from_json
 from mario.query_builder import ViewBasedQueryBuilder, SubsetQueryBuilder
@@ -515,5 +515,18 @@ def test_partitioning_extractor_streaming():
     )
 
 
-
+def test_hyper_total_measure():
+    dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
+    dataset.measures = []
+    metadata = metadata_from_json(os.path.join('test', 'metadata.json'))
+    configuration = Configuration(
+        file_path=os.path.join('test', 'orders.hyper')
+    )
+    extractor = HyperFile(
+        dataset_specification=dataset,
+        metadata=metadata,
+        configuration=configuration
+    )
+    assert extractor.get_total() == 10194
+    assert extractor.get_total(measure='Sales') == 2326534.354299952
 

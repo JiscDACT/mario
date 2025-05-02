@@ -223,13 +223,21 @@ class HyperFile(DataExtractor):
         )
 
     def get_total(self, measure=None):
-        from mario.hyper_utils import get_row_count, get_default_table_and_schema
+        from mario.hyper_utils import get_row_count, get_default_table_and_schema, get_total
         schema, table = get_default_table_and_schema(self.configuration.file_path)
-        return get_row_count(
-            hyper_file_path=self.configuration.file_path,
-            schema=schema,
-            table=table
-        )
+        if measure is None:
+            return get_row_count(
+                hyper_file_path=self.configuration.file_path,
+                schema=schema,
+                table=table
+            )
+        else:
+            return get_total(
+                hyper_file_path=self.configuration.file_path,
+                schema=schema,
+                table=table,
+                measure=measure
+            )
 
     def save_data_as_hyper(self, file_path: str, table: str = 'Extract', schema: str = 'Extract', minimise=False):
         if minimise:
