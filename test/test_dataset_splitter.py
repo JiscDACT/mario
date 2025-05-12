@@ -161,3 +161,45 @@ def test_dataset_splitter_gz():
     assert 'orders.csv' in os.listdir(os.path.join('output', 'test_dataset_splitter_info', 'Furniture'))
 
 
+def test_dataset_splitter_parallel():
+    """
+    This mimics a workflow that takes the elements
+    of the splitter and runs them in separate processes.
+    :return: None
+    """
+
+    # Get the total rows from the test CSV
+    total_rows_original = count_rows_in_csv(os.path.join('test', 'test_split_source', 'orders.csv'))
+
+    dataset_splitter = DatasetSplitter(
+        field='Region',
+        source_path=os.path.join('test', 'test_split_source'),
+        output_path=os.path.join('output', 'test_dataset_splitter_parallel')
+    )
+    files_to_split, files_to_copy = dataset_splitter.get_files_to_split_or_copy()
+    print("Files to split", files_to_split)
+    print("Files to copy", files_to_copy)
+    for file in files_to_split:
+        if file.endswith('.xlsx'):
+            print("Splitting Excel file", file)
+            for value in dataset_splitter.get_excel_values(file):
+                print("Splitting Excel file by value", value)
+                dataset_splitter.split_excel_by_value(file, value)
+        else:
+            print("Splitting CSV file", file)
+            dataset_splitter.split_file(file)
+    for file in files_to_copy:
+        dataset_splitter.copy_other_file(file)
+    print("Split files", os.listdir(os.path.join('output', 'test_dataset_splitter_parallel', 'Central')))
+    assert 'Central' in os.listdir(os.path.join('output', 'test_dataset_splitter_parallel'))
+    assert 'orders.csv' in os.listdir(os.path.join('output', 'test_dataset_splitter_parallel', 'Central'))
+    assert 'orders.xlsx' in os.listdir(os.path.join('output', 'test_dataset_splitter_parallel', 'Central'))
+    assert 'README.txt' in os.listdir(os.path.join('output', 'test_dataset_splitter_parallel', 'Central'))
+
+    assert len(os.listdir(os.path.join('output', 'test_dataset_splitter_parallel'))) == 4
+
+    total_rows = 0
+    for region in ['Central', 'East', 'West', 'South']:
+        total_rows += count_rows_in_csv(os.path.join('output', 'test_dataset_splitter_parallel', region, 'orders.csv'))
+    assert total_rows_original == total_rows
+

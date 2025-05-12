@@ -123,4 +123,20 @@ def get_unique_values_for_workbook(file_path, field):
     raise ValueError("No valid worksheet containing field values")
 
 
+def set_excel_active_sheet(file_path: str):
+    """
+    Deselects the active tabs, forcing the workbook to refresh on open.
+    Useful for refreshing pivots and ensuring tabs aren't grouped on open
+    :param file_path: the path to the workbook
+    :return: None
+    """
+    from openpyxl import load_workbook
+
+    workbook: Workbook = load_workbook(file_path)
+    for sheet in workbook:
+        workbook[sheet.title].views.sheetView[0].tabSelected = False
+    workbook.save(file_path)
+    workbook.close()
+
+
 

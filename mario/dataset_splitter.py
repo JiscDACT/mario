@@ -8,7 +8,7 @@ import logging
 
 from openpyxl import Workbook
 
-from mario.excel_pivot_utils import get_unique_values_for_workbook
+from mario.excel_pivot_utils import get_unique_values_for_workbook, set_excel_active_sheet
 
 logger = logging.getLogger(__name__)
 
@@ -50,22 +50,40 @@ class DatasetSplitter:
     def get_output_path(self, file, field_value):
         return os.path.join(self.output_path, field_value, file)
 
-    def split_files(self):
+    def get_files_to_split_or_copy(self):
         # Iterate over each file in the source folder
-        split_files_count = 0
+        files_to_split = []
+        files_to_copy = []
         for file in os.listdir(self.source_path):
             if os.path.isfile(os.path.join(self.source_path, file)):
                 if file.endswith('.xlsx'):
-                    self.split_excel(file)
-                    split_files_count += 1
+                    try:
+                        self.get_excel_values(file)
+                        files_to_split.append(file)
+                    except Exception:
+                        files_to_copy.append(file)
                 elif file.endswith('.csv'):
-                    self.split_csv(file)
-                    split_files_count += 1
+                    files_to_split.append(file)
                 elif file.endswith('.csv.gz'):
-                    self.split_gzipped_csv(file)
-                    split_files_count += 1
-        if split_files_count == 0:
+                    files_to_split.append(file)
+                else:
+                    files_to_copy.append(file)
+        if len(files_to_split) == 0:
             raise ValueError("No files were split")
+        return files_to_split, files_to_copy
+
+    def split_file(self, file):
+        if file.endswith('.xlsx'):
+            self.split_excel(file)
+        elif file.endswith('.csv'):
+            self.split_csv(file)
+        elif file.endswith('.csv.gz'):
+            self.split_gzipped_csv(file)
+
+    def split_files(self):
+        files_to_split, files_to_copy = self.get_files_to_split_or_copy()
+        for file in files_to_split:
+            self.split_file(file)
 
     def copy_other_file(self, file):
         logger.info(f"Copying file {file} to output directory")
@@ -81,10 +99,8 @@ class DatasetSplitter:
         each 'split' output directory present
         :return: None
         """
-        for file in os.listdir(self.source_path):
-            if not file.endswith('.xlsx') and not file.endswith('.csv') and not file.endswith('.csv.gz'):
-                self.other_files.append(file)
-        for file in self.other_files:
+        files_to_split, files_to_copy = self.get_files_to_split_or_copy()
+        for file in files_to_copy:
             self.copy_other_file(file)
 
     def process_batch(self, batch, column_name, file_handles, file_name):
@@ -161,55 +177,58 @@ class DatasetSplitter:
         for handle in file_handles.values():
             handle.close()
 
-    def split_excel(self, file_name: str):
+    def get_excel_values(self, file_name: str):
+        file_path = os.path.join(self.source_path, file_name)
+        return get_unique_values_for_workbook(file_path=file_path, field=self.field)
+
+    def split_excel_by_value(self, file_name, value: str):
         import pandas as pd
         from openpyxl import load_workbook
 
         file_path = os.path.join(self.source_path, file_name)
-        sheet_names = pd.ExcelFile(file_path).sheet_names
 
+        logger.info(f"Splitting for value {value}")
+        sheet_names = pd.ExcelFile(file_path).sheet_names
+        split_output_path = os.path.join(self.output_path, str(value))
+        split_workbook_path = os.path.join(split_output_path, file_name)
+        os.makedirs(split_output_path, exist_ok=True)
+        shutil.copyfile(src=file_path, dst=split_workbook_path)
+
+        for sheet_name in sheet_names:
+            workbook: Workbook = load_workbook(split_workbook_path)
+            if len(workbook.get_sheet_by_name(sheet_name)._pivots) > 0:
+                logger.info(f"Splitting excel pivot")
+                self.split_excel_pivot(
+                    workbook=workbook,
+                    file_path=split_workbook_path,
+                    sheet_name=sheet_name,
+                    value=value
+                )
+            else:
+                logger.info(f"Splitting excel sheet")
+                self.split_excel_table(
+                    workbook=workbook,
+                    file_path=split_workbook_path,
+                    sheet_name=sheet_name,
+                    value=value
+                )
+            workbook.close()
+
+        return split_workbook_path
+
+    def split_excel(self, file_name: str):
         # Get the values
         try:
-            values = get_unique_values_for_workbook(file_path=file_path, field=self.field)
+            values = self.get_excel_values(file_name = file_name)
         except ValueError:
             logger.warning("Encountered an Excel file with no data; treating as an 'other' file")
             self.other_files.append(file_name)
-            return None
+            return False
 
         # Create split workbooks
         for value in values:
-            logger.info(f"Splitting for value {value}")
-            split_output_path = os.path.join(self.output_path, str(value))
-            split_workbook_path = os.path.join(split_output_path, file_name)
-            os.makedirs(split_output_path, exist_ok=True)
-            shutil.copyfile(src=file_path, dst=split_workbook_path)
-
-            for sheet_name in sheet_names:
-                workbook: Workbook = load_workbook(split_workbook_path)
-                if len(workbook.get_sheet_by_name(sheet_name)._pivots) > 0:
-                    logger.info(f"Splitting excel pivot")
-                    self.split_excel_pivot(
-                        workbook=workbook,
-                        file_path=split_workbook_path,
-                        sheet_name=sheet_name,
-                        value=value
-                    )
-                else:
-                    logger.info(f"Splitting excel sheet")
-                    self.split_excel_table(
-                        workbook=workbook,
-                        file_path=split_workbook_path,
-                        sheet_name=sheet_name,
-                        value=value
-                    )
-                workbook.close()
-
-            # Set active sheet
-            workbook: Workbook = load_workbook(split_workbook_path)
-            for sheet in workbook:
-                workbook[sheet.title].views.sheetView[0].tabSelected = False
-            workbook.save(split_workbook_path)
-            workbook.close()
+            split_workbook_path = self.split_excel_by_value(file_name=file_name, value=value)
+            set_excel_active_sheet(file_path=split_workbook_path)
 
     def split_excel_pivot(self, workbook, file_path: str, sheet_name: str, value: str):
         from mario.excel_pivot_utils import replace_pivot_cache_with_subset
