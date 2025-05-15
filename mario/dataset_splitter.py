@@ -181,6 +181,12 @@ class DatasetSplitter:
         return get_unique_values_for_workbook(file_path=file_path, field=self.field)
 
     def split_excel_by_value(self, file_name, value: str):
+        """
+        Splits an Excel file by a single value.
+        :param file_name: the name of the Excel file (i.e. relative to the source path)
+        :param value: the value to split by
+        :return: the path to the split file for the value given e.g. output/Central/filename.xlsx
+        """
         import pandas as pd
         from openpyxl import load_workbook
         from mario.excel_pivot_utils import set_excel_active_sheet
@@ -194,6 +200,7 @@ class DatasetSplitter:
         os.makedirs(split_output_path, exist_ok=True)
         shutil.copyfile(src=file_path, dst=split_workbook_path)
 
+        # Load the workbook once per 'run'
         workbook = load_workbook(split_workbook_path)
         for sheet_name in sheet_names:
             if len(workbook.get_sheet_by_name(sheet_name)._pivots) > 0:
@@ -212,12 +219,22 @@ class DatasetSplitter:
                     sheet_name=sheet_name,
                     value=value
                 )
+        # Close the workbook explicitly once we're finished with it
+
         workbook.close()
+        # Clears the active sheet so we don't have any grouped tabs. This
+        # also seems to have a side effect of refreshing the pivot cache
         set_excel_active_sheet(split_workbook_path)
 
         return split_workbook_path
 
     def split_excel(self, file_name: str):
+        """
+        Convenience method for splitting an Excel file. Call the split methods
+        directly to process in parallel.
+        :param file_name:
+        :return:
+        """
         from mario.excel_pivot_utils import set_excel_active_sheet
         # Get the values
         try:
@@ -233,12 +250,28 @@ class DatasetSplitter:
             set_excel_active_sheet(file_path=split_workbook_path)
 
     def split_excel_pivot(self, workbook, file_path: str, sheet_name: str, value: str):
+        """
+        Splits an Excel pivot sheet
+        :param workbook: the workbook to split
+        :param file_path: the path to write the split file to
+        :param sheet_name: the name of the sheet
+        :param value: the value to split by
+        :return: None
+        """
         from mario.excel_pivot_utils import replace_pivot_cache_with_subset
         ws = workbook[sheet_name]
         replace_pivot_cache_with_subset(ws, self.field, value)
         workbook.save(file_path)
 
     def split_excel_table(self, workbook, file_path: str, sheet_name: str, value):
+        """
+        Splits a standard worksheet (i.e. not a pivot) for the specified value
+        :param workbook: the workbook to split
+        :param file_path: the file path to write the split file to
+        :param sheet_name: the name of the sheet
+        :param value: the value to split by
+        :return: None
+        """
 
         ws = workbook[sheet_name]
         header = [cell.value for cell in ws[1]]  # Read header row
@@ -251,7 +284,8 @@ class DatasetSplitter:
         new_ws = workbook[f"{sheet_name}_filtered"]
         new_ws.append(header)
 
-        # Read rows efficiently
+        # Read rows efficiently. Note that using comprehension first rather than writing direct from iter_rows
+        # speeds things up by about 50% at a cost of higher memory use.
         field_index = header.index(self.field)
         filtered_rows = [row for row in ws.iter_rows(min_row=2, values_only=True) if row[field_index] == value]
         for row in filtered_rows:
