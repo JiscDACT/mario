@@ -60,7 +60,9 @@ class DatasetSplitter:
                     try:
                         self.get_excel_values(file)
                         files_to_split.append(file)
+                        logger.debug(f"Excel file {file} is to be split")
                     except Exception:
+                        logger.debug(f"Excel file {file} has no values for field")
                         files_to_copy.append(file)
                 elif file.endswith('.csv'):
                     files_to_split.append(file)
@@ -194,8 +196,8 @@ class DatasetSplitter:
         os.makedirs(split_output_path, exist_ok=True)
         shutil.copyfile(src=file_path, dst=split_workbook_path)
 
+        workbook: Workbook = load_workbook(split_workbook_path)
         for sheet_name in sheet_names:
-            workbook: Workbook = load_workbook(split_workbook_path)
             if len(workbook.get_sheet_by_name(sheet_name)._pivots) > 0:
                 logger.info(f"Splitting excel pivot")
                 self.split_excel_pivot(
@@ -212,7 +214,8 @@ class DatasetSplitter:
                     sheet_name=sheet_name,
                     value=value
                 )
-            workbook.close()
+        workbook.close()
+        set_excel_active_sheet(split_workbook_path)
 
         return split_workbook_path
 
@@ -251,10 +254,9 @@ class DatasetSplitter:
 
         # Read rows efficiently
         field_index = header.index(self.field)
-
-        for row in ws.iter_rows(min_row=2, values_only=True):
-            if row[field_index] == value:
-                new_ws.append(row)
+        filtered_rows = [row for row in ws.iter_rows(min_row=2, values_only=True) if row[field_index] == value]
+        for row in filtered_rows:
+            new_ws.append(row)
 
         # Save and remove original sheet
         workbook.remove(ws)
