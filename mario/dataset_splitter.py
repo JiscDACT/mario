@@ -6,10 +6,6 @@ import shutil
 import csv
 import logging
 
-from openpyxl import Workbook
-
-from mario.excel_pivot_utils import get_unique_values_for_workbook, set_excel_active_sheet
-
 logger = logging.getLogger(__name__)
 
 
@@ -180,12 +176,14 @@ class DatasetSplitter:
             handle.close()
 
     def get_excel_values(self, file_name: str):
+        from mario.excel_pivot_utils import get_unique_values_for_workbook
         file_path = os.path.join(self.source_path, file_name)
         return get_unique_values_for_workbook(file_path=file_path, field=self.field)
 
     def split_excel_by_value(self, file_name, value: str):
         import pandas as pd
         from openpyxl import load_workbook
+        from mario.excel_pivot_utils import set_excel_active_sheet
 
         file_path = os.path.join(self.source_path, file_name)
 
@@ -196,7 +194,7 @@ class DatasetSplitter:
         os.makedirs(split_output_path, exist_ok=True)
         shutil.copyfile(src=file_path, dst=split_workbook_path)
 
-        workbook: Workbook = load_workbook(split_workbook_path)
+        workbook = load_workbook(split_workbook_path)
         for sheet_name in sheet_names:
             if len(workbook.get_sheet_by_name(sheet_name)._pivots) > 0:
                 logger.info(f"Splitting excel pivot")
@@ -220,6 +218,7 @@ class DatasetSplitter:
         return split_workbook_path
 
     def split_excel(self, file_name: str):
+        from mario.excel_pivot_utils import set_excel_active_sheet
         # Get the values
         try:
             values = self.get_excel_values(file_name = file_name)
@@ -239,7 +238,7 @@ class DatasetSplitter:
         replace_pivot_cache_with_subset(ws, self.field, value)
         workbook.save(file_path)
 
-    def split_excel_table(self, workbook: Workbook, file_path: str, sheet_name: str, value):
+    def split_excel_table(self, workbook, file_path: str, sheet_name: str, value):
 
         ws = workbook[sheet_name]
         header = [cell.value for cell in ws[1]]  # Read header row
