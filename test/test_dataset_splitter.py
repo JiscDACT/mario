@@ -1,3 +1,4 @@
+import datetime
 import shutil
 
 import pytest
@@ -203,3 +204,19 @@ def test_dataset_splitter_parallel():
         total_rows += count_rows_in_csv(os.path.join('output', 'test_dataset_splitter_parallel', region, 'orders.csv'))
     assert total_rows_original == total_rows
 
+
+def test_dataset_splitter_builder():
+    print('start', datetime.datetime.now().isoformat())
+    dataset_splitter = DatasetSplitter(
+        field='Ship Mode',
+        source_path=os.path.join('test', 'test_dataset_splitter_builder'),
+        output_path=os.path.join('output', 'test_dataset_splitter_builder'),
+        use_excel_builder=True,
+        template='excel_template.xlsx'
+    )
+    dataset_splitter.split_files()
+    dataset_splitter.copy_other_files()
+    assert 'First Class' in os.listdir(os.path.join('output', 'test_dataset_splitter_builder'))
+    assert len(os.listdir(os.path.join('output', 'test_dataset_splitter_builder'))) == 4
+    assert 'orders.xlsx' in os.listdir(os.path.join('output', 'test_dataset_splitter_builder', 'First Class'))
+    print('end', datetime.datetime.now().isoformat())

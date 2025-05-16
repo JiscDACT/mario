@@ -61,7 +61,7 @@ def get_subset(pivot_cache, field_name, field_value):
     return filtered_records
 
 
-def get_unique_values_in_worksheet(workbook, sheet_name, field) -> List[str]:
+def get_unique_values_from_pivot_worksheet(workbook, sheet_name, field) -> List[str]:
     ws = workbook[sheet_name]
     pivot = ws._pivots[0]
     cached_data = pivot.cache
@@ -88,7 +88,7 @@ def get_unique_values_in_worksheet(workbook, sheet_name, field) -> List[str]:
     return list(unique_values)
 
 
-def get_unique_values(file_path, sheet_name, field) -> List[str]:
+def get_unique_values_from_pivot_cache(file_path, sheet_name, field) -> List[str]:
     """
     Returns all the unique values for a column in a pivot cache
     :param file_path: the workbook file path
@@ -98,7 +98,7 @@ def get_unique_values(file_path, sheet_name, field) -> List[str]:
     """
     from openpyxl import load_workbook
     wb = load_workbook(file_path, data_only=True)
-    return get_unique_values_in_worksheet(workbook=wb, sheet_name=sheet_name, field=field)
+    return get_unique_values_from_pivot_worksheet(workbook=wb, sheet_name=sheet_name, field=field)
 
 
 def get_header(file_path: str, sheet_name: str):
@@ -110,17 +110,38 @@ def sheet_contains_column_name(file_path: str, sheet_name: str, field: str):
     return field in get_header(file_path=file_path, sheet_name=sheet_name)
 
 
-def get_unique_values_for_workbook(file_path, field):
+def get_unique_values_for_workbook(file_path, field) -> List[str] | None:
+    """
+    Gets the unique values for a field from an Excel workbook. The
+    function iterates over the sheets in the workbook until it
+    finds a sheet containing the data - either a regular sheet or
+    a sheet containing a pivot.
+    :param file_path: the path to the Excel file
+    :param field: the field to get values for
+    :return: a list of unique values
+    :raises: ValueError if no sheets contain the field
+    """
     from openpyxl import load_workbook
     wb: Workbook = load_workbook(file_path, data_only=True)
     for sheet in wb.sheetnames:
         ws = wb[sheet]
         if len(ws._pivots) > 0:
-            return get_unique_values_in_worksheet(workbook=wb, sheet_name=sheet, field=field)
+            return get_unique_values_from_pivot_worksheet(workbook=wb, sheet_name=sheet, field=field)
         else:
             if sheet_contains_column_name(file_path=file_path, sheet_name=sheet, field=field):
                 return pd.read_excel(file_path, sheet_name=sheet, dtype={field: object}, usecols=[field])[field].unique().tolist()
     raise ValueError("No valid worksheet containing field values")
+
+
+def get_info_sheets(workbook, field):
+    info_sheets = []
+    for sheet in workbook.sheetnames:
+        ws = workbook[sheet]
+        if len(ws._pivots) == 0:
+            headers = [c.value for c in next(workbook[sheet].iter_rows(min_row=1, max_row=1))]
+            if field not in headers:
+                info_sheets.append(sheet)
+    return info_sheets
 
 
 def set_excel_active_sheet(file_path: str):
@@ -137,6 +158,31 @@ def set_excel_active_sheet(file_path: str):
         workbook[sheet.title].views.sheetView[0].tabSelected = False
     workbook.save(file_path)
     workbook.close()
+
+
+def get_worksheet_containing_field(workbook, field):
+    for sheet in workbook.sheetnames:
+        headers = [c.value for c in next(workbook[sheet].iter_rows(min_row=1, max_row=1))]
+        if field in headers:
+            return sheet
+
+
+def prepend_sheet_to_workbook(source_workbook_file, target_workbook_file, sheet_name) -> None:
+    """
+    Prepends the specified sheet from the source workbook to the target workbook
+    :param source_workbook_file: the source Excel file
+    :param target_workbook_file: the target Excep file
+    :param sheet_name: the sheet to prepend
+    :return: None
+    """
+    from openpyxl import Workbook, load_workbook
+    target_workbook: Workbook = load_workbook(target_workbook_file)
+    source_workbook = load_workbook(source_workbook_file)
+    source = source_workbook[sheet_name]
+    source._parent = target_workbook
+    target_workbook._add_sheet(sheet=source)
+    target_workbook.move_sheet(sheet=source, offset=-(len(target_workbook.sheetnames) - 1))
+    target_workbook.save(target_workbook_file)
 
 
 

@@ -11,11 +11,16 @@ logger = logging.getLogger(__name__)
 
 class DatasetSplitter:
 
-    def __init__(self, field: str, source_path: str, output_path: str):
+    def __init__(self, field: str, source_path: str, output_path: str, use_excel_builder=False, template=None):
         self.field = field
         self.source_path = source_path
         self.output_path = output_path
         self.other_files = []
+        self.use_excel_builder = use_excel_builder
+        self.template = template
+
+        if self.use_excel_builder is True and (template is None or not os.path.exists(template)):
+            raise ValueError("You must specify a valid template file to use the Excel Builder")
 
         # If the source path doesn't exist, raise an error
         if not os.path.exists(self.source_path):
@@ -72,7 +77,10 @@ class DatasetSplitter:
 
     def split_file(self, file):
         if file.endswith('.xlsx'):
-            self.split_excel(file)
+            if self.use_excel_builder:
+                self.split_excel_using_builder(file)
+            else:
+                self.split_excel(file)
         elif file.endswith('.csv'):
             self.split_csv(file)
         elif file.endswith('.csv.gz'):
@@ -175,6 +183,84 @@ class DatasetSplitter:
         for handle in file_handles.values():
             handle.close()
 
+    def split_excel_using_builder(self, file_name: str) -> None:
+        """
+        Splits an Excel file by using the ExcelBuilder to create
+        a new workbook containing both a Data sheet and a Pivot sheet
+        :param file_name: the name of the Excel file to split
+        :return: None
+        """
+        from mario.excel_builder import ExcelBuilder
+        from mario.data_extractor import DataFrameExtractor
+        from mario.dataset_specification import DatasetSpecification
+        from mario.metadata import Metadata, Item
+        from mario.excel_pivot_utils import prepend_sheet_to_workbook, get_worksheet_containing_field, get_info_sheets
+        import pandas as pd
+        from openpyxl import load_workbook
+
+        file_path = os.path.join(self.source_path, file_name)
+
+        # Create a dataset based on the contents of the 'Data' sheet in the Excel workbook. We find this
+        # by locating a 'data sheet' that has the field name in the header. At the same time we identify
+        # any 'info' sheets that don't have any data as we want to copy those as-is
+        workbook = load_workbook(file_path)
+        data_sheet = get_worksheet_containing_field(workbook, self.field)
+        info_sheets = get_info_sheets(workbook, self.field)
+
+        if data_sheet is None:
+            logger.warning("Encountered an Excel file with no data sheet; treating as an 'other' file")
+            self.other_files.append(file_name)
+            return
+
+        # Read in the data and get unique values for the field we want to split by
+        df = pd.read_excel(file_path, sheet_name=data_sheet,  dtype={self.field: object}, header=0)
+        values = df[self.field].unique()
+
+        # Generate some basic metadata
+        ds = DatasetSpecification()
+        ds.dimensions = list(df.columns)
+        ds.measures = []
+        md = Metadata()
+        for field in df.columns:
+            item = Item()
+            item.name = field
+            md.add_item(item)
+
+        # Create a data extractor instance for the DF
+        dx = DataFrameExtractor(
+            dataset_specification=ds,
+            metadata=md,
+            dataframe=df
+        )
+
+        # Create an ExcelBuilder instance for creating excel files
+        builder = ExcelBuilder(
+            output_file_path='',
+            template_path=self.template,
+            dataset_specification=ds,
+            metadata=md,
+            data_extractor=dx
+        )
+
+        # For each unique value, subset the data and create the output
+        for value in values:
+            logger.info(f"Splitting {file_name} for value {value}")
+            output_folder = os.path.join(self.output_path, value)
+            os.makedirs(output_folder, exist_ok=True)
+            output_path = os.path.join(output_folder, file_name)
+            builder.filepath = output_path
+            subset = df[df[self.field] == value]
+            dx._data = subset
+            builder.create_workbook(create_notes_page=False)
+
+            # prepend any info sheets, if present
+            for info_sheet in info_sheets:
+                prepend_sheet_to_workbook(
+                    source_workbook_file=file_path,
+                    target_workbook_file=output_path,
+                    sheet_name=info_sheet
+                )
+
     def get_excel_values(self, file_name: str):
         from mario.excel_pivot_utils import get_unique_values_for_workbook
         file_path = os.path.join(self.source_path, file_name)
@@ -238,7 +324,7 @@ class DatasetSplitter:
         from mario.excel_pivot_utils import set_excel_active_sheet
         # Get the values
         try:
-            values = self.get_excel_values(file_name = file_name)
+            values = self.get_excel_values(file_name=file_name)
         except ValueError:
             logger.warning("Encountered an Excel file with no data; treating as an 'other' file")
             self.other_files.append(file_name)
