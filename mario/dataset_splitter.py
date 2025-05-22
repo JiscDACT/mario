@@ -11,13 +11,21 @@ logger = logging.getLogger(__name__)
 
 class DatasetSplitter:
 
-    def __init__(self, field: str, source_path: str, output_path: str, use_excel_builder=False, template=None):
+    def __init__(self,
+                 field: str,
+                 source_path: str,
+                 output_path: str,
+                 use_excel_builder=False,
+                 template=None,
+                 append_info_sheets=False
+                 ):
         self.field = field
         self.source_path = source_path
         self.output_path = output_path
         self.other_files = []
         self.use_excel_builder = use_excel_builder
         self.template = template
+        self.append_info_sheets = append_info_sheets
 
         if self.use_excel_builder is True and (template is None or not os.path.exists(template)):
             raise ValueError("You must specify a valid template file to use the Excel Builder")
@@ -205,7 +213,6 @@ class DatasetSplitter:
         # any 'info' sheets that don't have any data as we want to copy those as-is
         workbook = load_workbook(file_path)
         data_sheet = get_worksheet_containing_field(workbook, self.field)
-        info_sheets = get_info_sheets(workbook, self.field)
 
         if data_sheet is None:
             logger.warning("Encountered an Excel file with no data sheet; treating as an 'other' file")
@@ -254,12 +261,13 @@ class DatasetSplitter:
             builder.create_workbook(create_notes_page=False)
 
             # prepend any info sheets, if present
-            for info_sheet in info_sheets:
-                prepend_sheet_to_workbook(
-                    source_workbook_file=file_path,
-                    target_workbook_file=output_path,
-                    sheet_name=info_sheet
-                )
+            if self.append_info_sheets:
+                for info_sheet in get_info_sheets(workbook, self.field):
+                    prepend_sheet_to_workbook(
+                        source_workbook_file=file_path,
+                        target_workbook_file=output_path,
+                        sheet_name=info_sheet
+                    )
 
     def get_excel_values(self, file_name: str):
         from mario.excel_pivot_utils import get_unique_values_for_workbook
