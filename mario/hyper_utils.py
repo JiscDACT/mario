@@ -102,7 +102,7 @@ def get_row_count(hyper_file_path: str, schema='public', table='default'):
 def add_row_numbers_to_hyper(input_hyper_file_path: str, schema='public', table='default'):
     from tableauhyperapi import HyperProcess, Telemetry, Connection, TableName, TableDefinition, SqlType
 
-    drop_columns_from_hyper(hyper_file_path=input_hyper_file_path, columns_to_drop=['row_number'])
+    drop_columns_from_hyper(hyper_file_path=input_hyper_file_path, columns_to_drop=['row_number'], schema=schema, table=table)
 
     with HyperProcess(telemetry=Telemetry.SEND_USAGE_DATA_TO_TABLEAU) as hyper:
         with Connection(endpoint=hyper.endpoint, database=input_hyper_file_path) as connection:
@@ -113,16 +113,17 @@ def add_row_numbers_to_hyper(input_hyper_file_path: str, schema='public', table=
                                                       connection.catalog.get_table_definition(
                                                           input_table_name).columns)
             output_table_definition.add_column(TableDefinition.Column('row_number', SqlType.big_int()))
-            connection.catalog.create_table(output_table_definition)
+            if output_table_name not in connection.catalog.get_table_names(schema):
+                connection.catalog.create_table(output_table_definition)
             log.debug("Created output table")
 
         with Connection(endpoint=hyper.endpoint, database=input_hyper_file_path) as connection:
             query = f"""
                     WITH CTE AS (
                         SELECT *, ROW_NUMBER() OVER() AS row_number
-                        FROM {input_table_name.name}
+                        FROM \"{schema}\".\"{input_table_name.name.unescaped}\"
                     )
-                    INSERT INTO {output_table_name.name}
+                    INSERT INTO \"{schema}\".\"{output_table_name.name.unescaped}\"
                         SELECT * FROM CTE
                     """
             connection.execute_command(query)
@@ -130,12 +131,12 @@ def add_row_numbers_to_hyper(input_hyper_file_path: str, schema='public', table=
 
         with Connection(endpoint=hyper.endpoint, database=input_hyper_file_path) as connection:
             drop_table_query = f"""
-                    DROP TABLE {input_table_name.name}
+                    DROP TABLE \"{schema}\".\"{input_table_name.name.unescaped}\"
             """
             connection.execute_command(drop_table_query)
             log.debug("Dropped old table")
             rename_table_query = f"""
-                    ALTER TABLE {output_table_name.name} RENAME TO {input_table_name.name}
+                    ALTER TABLE \"{schema}\".\"{output_table_name.name.unescaped}\" RENAME TO \"{input_table_name.name.unescaped}\"
             """
             connection.execute_command(rename_table_query)
             log.debug("Renamed new table")
