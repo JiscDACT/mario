@@ -530,3 +530,29 @@ def test_hyper_total_measure():
     assert extractor.get_total() == 10194
     assert extractor.get_total(measure='Sales') == 2326534.354299952
 
+
+def test_hyper_to_csv():
+    dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
+    dataset.measures = []
+    metadata = metadata_from_json(os.path.join('test', 'metadata.json'))
+    configuration = Configuration(
+        file_path=os.path.join('test', 'orders.hyper')
+    )
+    extractor = HyperFile(
+        dataset_specification=dataset,
+        metadata=metadata,
+        configuration=configuration
+    )
+    output_folder = os.path.join('output', 'test_hyper_to_csv')
+    os.makedirs(output_folder, exist_ok=True)
+    output_file = os.path.join(output_folder, 'orders.csv')
+    extractor.save_data_as_csv(
+        file_path=output_file,
+        minimise=False,
+        compress_using_gzip=False
+    )
+    assert extractor.get_total() == 10194
+    assert extractor.get_total(measure='Sales') == 2326534.354299952
+
+    df = pd.read_csv(output_file)
+    assert df['Sales'].sum() == 2326534.3543
