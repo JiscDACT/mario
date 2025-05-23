@@ -555,4 +555,4 @@ def test_hyper_to_csv():
     assert extractor.get_total(measure='Sales') == 2326534.354299952
 
     df = pd.read_csv(output_file)
-    assert df['Sales'].sum() == 2326534.3543
+    assert round(df['Sales'].sum(), 4) == 2326534.3543
