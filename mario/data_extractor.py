@@ -250,34 +250,60 @@ class HyperFile(DataExtractor):
                          compress_using_gzip=False,
                          chunk_size=100000
                          ):
-        from mario.hyper_utils import get_default_table_and_schema
+        from mario.hyper_utils import get_default_table_and_schema, add_row_numbers_to_hyper, drop_columns_from_hyper, get_column_list
         import pantab
+        import tempfile
+        import shutil
+        import os
 
-        if compress_using_gzip:
-            compression_options = dict(method='gzip')
-            file_path = file_path + '.gz'
-        elif file_path.endswith('.gz'):
-            compression_options = dict(method='gzip')
-        else:
-            compression_options = None
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_hyper = os.path.join(temp_dir, 'temp.hyper')
+            shutil.copyfile(
+                src=self.configuration.file_path,
+                dst=temp_hyper
+            )
 
-        mode = 'w'
-        header = True
-        offset = 0
-        schema, table = get_default_table_and_schema(self.configuration.file_path)
-        sql = f"SELECT * FROM \"{schema}\".\"{table}\""
+            schema, table = get_default_table_and_schema(temp_hyper)
 
-        while True:
-            query = f"{sql} LIMIT {chunk_size} OFFSET {offset}"
-            df_chunk = pantab.frame_from_hyper_query(self.configuration.file_path, query)
-            if df_chunk.empty:
-                break
-            df_chunk.to_csv(file_path, index=False, mode=mode, header=header,
-                            compression=compression_options)
-            offset += chunk_size
-            if header:
-                header = False
-                mode = "a"
+            columns = get_column_list(
+                hyper_file_path=temp_hyper,
+                schema=schema,
+                table=table
+            )
+
+            logger.debug("Adding row numbers to hyper so we can guarantee ordering")
+            add_row_numbers_to_hyper(
+                input_hyper_file_path=temp_hyper,
+                schema=schema,
+                table=table
+            )
+
+            if compress_using_gzip:
+                compression_options = dict(method='gzip')
+                file_path = file_path + '.gz'
+            elif file_path.endswith('.gz'):
+                compression_options = dict(method='gzip')
+            else:
+                compression_options = None
+
+            mode = 'w'
+            header = True
+            offset = 0
+            column_names = ','.join(f'"{column}"' for column in columns)
+
+            sql = f"SELECT {column_names} FROM \"{schema}\".\"{table}\" ORDER BY row_number"
+
+            while True:
+                query = f"{sql} LIMIT {chunk_size} OFFSET {offset}"
+                df_chunk = pantab.frame_from_hyper_query(temp_hyper, query)
+                if df_chunk.empty:
+                    break
+                df_chunk.to_csv(file_path, index=False, mode=mode, header=header,
+                                compression=compression_options)
+                offset += chunk_size
+                if header:
+                    header = False
+                    mode = "a"
 
 
 class StreamingDataExtractor(DataExtractor):
