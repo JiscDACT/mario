@@ -695,7 +695,10 @@ class PartitioningExtractor(DataExtractor):
                     if minimise:
                         self.__minimise_data__()
                         df = self._data
-                logger.info(f"Saving {chunk_size} rows to file")
-                frame_to_hyper(df, database=file_path, table=table_name, table_mode='a')
+                if len(df) == 0:
+                    logger.warning(f"No rows found for partition with value '{partition_value}'")
+                else:
+                    logger.info(f"Saving {chunk_size} rows to file")
+                    frame_to_hyper(df, database=file_path, table=table_name, table_mode='a')
 
 
