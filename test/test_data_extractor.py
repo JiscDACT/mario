@@ -595,3 +595,61 @@ def test_partitioning_extractor_partition_sql_no_data_in_partition():
         file_path=csv_file,
         compress_using_gzip=True
     )
+
+
+def test_partitioning_extractor_with_row_numbers():
+    # Skip this test if we don't have a connection string
+    if not os.environ.get('CONNECTION_STRING'):
+        pytest.skip("Skipping SQL test as no database configured")
+
+    from mario.hyper_utils import get_column_list
+
+    dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
+    constraint = Constraint()
+    constraint.item = 'City'
+    constraint.allowed_values = ['Houston', 'Laredo', 'Springfield']
+    dataset.constraints.append(constraint)
+    metadata = metadata_from_json(os.path.join('test', 'metadata.json'))
+    configuration = Configuration(
+        connection_string=os.environ.get('CONNECTION_STRING'),
+        schema="dev",
+        view="superstore",
+        query_builder=SubsetQueryBuilder
+    )
+    extractor = PartitioningExtractor(
+        configuration=configuration,
+        dataset_specification=dataset,
+        metadata=metadata,
+        partition_column='City'
+    )
+
+    path = os.path.join('output', 'test_partitioning_extractor_with_row_numbers')
+    file = os.path.join(path, 'test.hyper')
+    csv_file = os.path.join(path, 'test.csv')
+
+    os.makedirs(path, exist_ok=True)
+
+    extractor.stream_sql_to_hyper(
+        file_path=file,
+        include_row_numbers=True
+    )
+    # Check row_number in hyper output
+    assert 'row_number' in get_column_list(hyper_file_path=file, schema='Extract', table='Extract')
+
+    # Load it up and export a CSV
+    hyper_config = Configuration(
+        file_path=file
+    )
+    hyper = HyperFile(
+        configuration=hyper_config,
+        dataset_specification=dataset,
+        metadata=metadata
+    )
+
+    hyper.save_data_as_csv(
+        file_path=csv_file,
+        compress_using_gzip=False
+    )
+    columns = pd.read_csv(csv_file).columns
+    # Check row_number omitted in CSV output
+    assert 'row_number' not in columns

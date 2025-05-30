@@ -250,7 +250,7 @@ class HyperFile(DataExtractor):
                          compress_using_gzip=False,
                          chunk_size=100000
                          ):
-        from mario.hyper_utils import get_default_table_and_schema, add_row_numbers_to_hyper, drop_columns_from_hyper, get_column_list
+        from mario.hyper_utils import get_default_table_and_schema, add_row_numbers_to_hyper, get_column_list
         import pantab
         import tempfile
         import shutil
@@ -272,11 +272,15 @@ class HyperFile(DataExtractor):
             )
 
             logger.debug("Adding row numbers to hyper so we can guarantee ordering")
-            add_row_numbers_to_hyper(
-                input_hyper_file_path=temp_hyper,
-                schema=schema,
-                table=table
-            )
+            if 'row_number' not in columns:
+                add_row_numbers_to_hyper(
+                    input_hyper_file_path=temp_hyper,
+                    schema=schema,
+                    table=table
+                )
+            else:
+                # Remove it so we don't include it in the output
+                columns.remove('row_number')
 
             if compress_using_gzip:
                 compression_options = dict(method='gzip')
@@ -628,7 +632,8 @@ class PartitioningExtractor(DataExtractor):
                           allow_nulls: bool = True,
                           chunk_size: int = 100000,
                           compress_using_gzip: bool = False,
-                          minimise: bool = False
+                          minimise: bool = False,
+                          include_row_numbers: bool = False
                           ):
         """
         Write From SQL to CSV using streaming. No data is held in memory
@@ -647,6 +652,9 @@ class PartitioningExtractor(DataExtractor):
 
         mode = 'w'
         header = True
+
+        row_counter = 0  # Initialize global row counter
+
         for partition_value in self.__get_partition_values__():
             query = self.__build_query_using_partition__(partition_value=partition_value)
             for df in pd.read_sql(get_formatted_query(query[0],query[1]), connection, chunksize=chunk_size):
@@ -657,6 +665,9 @@ class PartitioningExtractor(DataExtractor):
                     if minimise:
                         self.__minimise_data__()
                         df = self._data
+                if include_row_numbers:
+                    df['row_number'] = range(row_counter, row_counter + len(df))
+                    row_counter += len(df)  # Update the counter
                 df.to_csv(file_path, mode=mode, header=header, index=False, compression=compression_options)
                 if header:
                     header = False
@@ -671,7 +682,9 @@ class PartitioningExtractor(DataExtractor):
                             validate: bool = False,
                             allow_nulls: bool = True,
                             minimise: bool = False,
-                            chunk_size: int = 100000):
+                            chunk_size: int = 100000,
+                            include_row_numbers: bool = False
+                            ):
         """
         Write From SQL to .hyper using streaming. No data is held in memory
         apart from chunks of rows as they are read.
@@ -685,6 +698,9 @@ class PartitioningExtractor(DataExtractor):
 
         connection = self.get_connection()
         table_name = TableName(schema, table)
+
+        row_counter = 0  # Initialize global row counter
+
         for partition_value in self.__get_partition_values__():
             query = self.__build_query_using_partition__(partition_value=partition_value)
             for df in pd.read_sql(get_formatted_query(query[0], query[1]), connection, chunksize=chunk_size):
@@ -695,6 +711,9 @@ class PartitioningExtractor(DataExtractor):
                     if minimise:
                         self.__minimise_data__()
                         df = self._data
+                if include_row_numbers:
+                    df['row_number'] = range(row_counter, row_counter + len(df))
+                    row_counter += len(df)  # Update the counter
                 if len(df) == 0:
                     logger.warning(f"No rows found for partition with value '{partition_value}'")
                 else:
