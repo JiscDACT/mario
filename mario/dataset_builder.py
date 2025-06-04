@@ -64,11 +64,11 @@ class DatasetBuilder:
                     if 'hierarchies' in item.properties:
                         item.set_property('hierarchies',  [h for h in item.get_property('hierarchies') if h['hierarchy'] != hierarchy])
 
-    def build(self, output_format: Format, file_path: str, template_path: str = None):
+    def build(self, output_format: Format, file_path: str, template_path: str = None, **kwargs):
         if output_format == Format.TABLEAU_PACKAGED_DATASOURCE:
             self.__build_tdsx__(file_path)
         elif output_format == Format.CSV:
-            self.__build_csv__(file_path)
+            self.__build_csv__(file_path, **kwargs)
         elif output_format == Format.EXCEL_PIVOT:
             self.__build_excel_pivot__(file_path, template_path)
         elif output_format == Format.EXCEL_INFO_SHEET:
@@ -100,9 +100,9 @@ class DatasetBuilder:
         )
         excel_builder.create_workbook()
 
-    def __build_csv__(self, file_path: str, compress_using_gzip=False):
+    def __build_csv__(self, file_path: str, **kwargs):
         # TODO export Info sheet as well - see code in Automation2.0 and TDSA.
-        self.data.save_data_as_csv(file_path=file_path, compress_using_gzip=compress_using_gzip)
+        self.data.save_data_as_csv(file_path=file_path, **kwargs)
 
     def __build_tdsx__(self, file_path: str):
         from mario.hyper_utils import get_default_table_and_schema
