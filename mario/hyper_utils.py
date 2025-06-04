@@ -317,8 +317,11 @@ def save_hyper_as_csv(hyper_file: str, file_path: str, **kwargs):
             )
         else:
             log.debug("Data source already contains row numbers")
-            # Remove it so we don't include it in the output
+
+        if options.include_row_numbers is False and 'row_number' in columns:
             columns.remove('row_number')
+        elif options.include_row_numbers is True and 'row_number' not in columns:
+            columns.append('row_number')
 
         if options.compress_using_gzip:
             compression_options = dict(method='gzip')

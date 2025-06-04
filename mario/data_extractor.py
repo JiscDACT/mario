@@ -142,10 +142,12 @@ class DataExtractor:
 
     def validate_data(self, allow_nulls=True):
         from mario.validation import DataFrameValidator
+        if self._data is None:
+            self.get_data_frame()
         validator = DataFrameValidator(
             self.dataset_specification,
             self.metadata,
-            data=self.get_data_frame()
+            data=self._data
         )
         return validator.validate_data(allow_nulls)
 
@@ -155,6 +157,17 @@ class DataExtractor:
         if minimise:
             self.__minimise_data__()
         return self._data
+
+    def __add_row_numbers__(self):
+        if self._data is None:
+            self.__load__()
+        self._data['row_number'] = range(len(self._data))
+
+    def __drop_row_numbers__(self):
+        if self._data is None:
+            self.__load__()
+        if 'row_number' in self._data.columns:
+            self._data = self._data .drop(columns=['row_number'])
 
     def save_query(self, file_path: str, formatted: bool = False):
         """
@@ -176,8 +189,14 @@ class DataExtractor:
         options = CsvOptions(**kwargs)
         if self._data is None:
             self.__load__()
+        if options.include_row_numbers:
+            self.__add_row_numbers__()
+        else:
+            self.__drop_row_numbers__()
         if options.minimise:
             self.__minimise_data__()
+        if options.validate:
+            self.validate_data(allow_nulls=options.allow_nulls)
         if options.compress_using_gzip:
             compression_options = dict(method='gzip')
             file_path = file_path + '.gz'
@@ -190,8 +209,14 @@ class DataExtractor:
         options = HyperOptions(**kwargs)
         if self._data is None:
             self.__load__()
+        if options.include_row_numbers:
+            self.__add_row_numbers__()
+        else:
+            self.__drop_row_numbers__()
         if options.minimise:
             self.__minimise_data__()
+        if options.validate:
+            self.validate_data(allow_nulls=options.allow_nulls)
         save_dataframe_as_hyper(df=self._data, file_path=file_path, **kwargs)
 
 
@@ -249,6 +274,8 @@ class HyperFile(DataExtractor):
         options = HyperOptions(**kwargs)
         if options.minimise:
             self.__minimise_data__()
+        if options.validate:
+            self.validate_data(allow_nulls=options.allow_nulls)
         save_hyper_as_hyper(hyper_file=self.configuration.file_path, file_path=file_path, **kwargs)
 
     def save_data_as_csv(self,file_path: str, **kwargs):
@@ -256,7 +283,8 @@ class HyperFile(DataExtractor):
         options = CsvOptions(**kwargs)
         if options.minimise:
             self.__minimise_data__()
-
+        if options.validate:
+            self.validate_data(allow_nulls=options.allow_nulls)
         save_hyper_as_csv(
             hyper_file=self.configuration.file_path,
             file_path=file_path,
