@@ -66,7 +66,7 @@ class DatasetBuilder:
 
     def build(self, output_format: Format, file_path: str, template_path: str = None, **kwargs):
         if output_format == Format.TABLEAU_PACKAGED_DATASOURCE:
-            self.__build_tdsx__(file_path)
+            self.__build_tdsx__(file_path, **kwargs)
         elif output_format == Format.CSV:
             self.__build_csv__(file_path, **kwargs)
         elif output_format == Format.EXCEL_PIVOT:
@@ -104,7 +104,7 @@ class DatasetBuilder:
         # TODO export Info sheet as well - see code in Automation2.0 and TDSA.
         self.data.save_data_as_csv(file_path=file_path, **kwargs)
 
-    def __build_tdsx__(self, file_path: str):
+    def __build_tdsx__(self, file_path: str, **kwargs):
         from mario.hyper_utils import get_default_table_and_schema
         from tableau_builder.json_metadata import JsonRepository
         with tempfile.TemporaryDirectory() as temp_folder:
@@ -116,7 +116,7 @@ class DatasetBuilder:
 
             # Move the hyper extract
             data_file_path = os.path.join(temp_folder, 'data.hyper')
-            self.data.save_data_as_hyper(file_path=data_file_path)
+            self.data.save_data_as_hyper(file_path=data_file_path, **kwargs)
 
             # Get the table and schema name from the extract
             schema, table = get_default_table_and_schema(data_file_path)
