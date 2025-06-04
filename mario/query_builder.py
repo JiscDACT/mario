@@ -13,8 +13,9 @@ logger = logging.getLogger(__name__)
 
 def get_formatted_query(query, params):
     formatted_query = copy(query)
-    for key, value in params.items():
-        formatted_query = formatted_query.replace(f'%({key})s', f"'{value}'")
+    if len(params) > 0:
+        for key, value in params.items():
+            formatted_query = formatted_query.replace(f'%({key})s', f"'{value}'")
     return formatted_query
 
 
