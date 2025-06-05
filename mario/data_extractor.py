@@ -270,12 +270,19 @@ class HyperFile(DataExtractor):
             )
 
     def save_data_as_hyper(self, file_path: str, **kwargs):
-        from mario.hyper_utils import save_hyper_as_hyper
+        from mario.hyper_utils import save_hyper_as_hyper, add_row_numbers_to_hyper, get_default_table_and_schema
         options = HyperOptions(**kwargs)
         if options.minimise:
             self.__minimise_data__()
         if options.validate:
             self.validate_data(allow_nulls=options.allow_nulls)
+        if options.include_row_numbers:
+            schema, table = get_default_table_and_schema(self.configuration.file_path)
+            add_row_numbers_to_hyper(
+                input_hyper_file_path=self.configuration.file_path,
+                schema=schema,
+                table=table
+            )
         save_hyper_as_hyper(hyper_file=self.configuration.file_path, file_path=file_path, **kwargs)
 
     def save_data_as_csv(self,file_path: str, **kwargs):
@@ -383,14 +390,18 @@ class StreamingDataExtractor(DataExtractor):
 
         connection = self.get_connection()
         table_name = TableName(options.schema, options.table)
+        row_counter = 0
         for df in pd.read_sql(self._query[0], connection, chunksize=options.chunk_size):
-            if options.validate or options.minimise:
+            if options.validate or options.minimise or options.include_row_numbers:
                 self._data = df
                 if options.validate:
                     self.validate_data(allow_nulls=options.allow_nulls)
                 if options.minimise:
                     self.__minimise_data__()
                     df = self._data
+                if options.include_row_numbers:
+                    df['row_number'] = range(row_counter, row_counter + len(df))
+                    row_counter += len(df)  # Update the counter
             frame_to_hyper(df, database=file_path, table=table_name, table_mode='a')
 
     def stream_sql_query_to_csv(self, file_path, query, connection, row_counter=0, **kwargs) -> int:

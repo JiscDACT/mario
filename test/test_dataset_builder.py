@@ -1,5 +1,8 @@
+import shutil
+
 import pandas as pd
 import pantab
+from tableauhyperapi import TableName
 
 from mario.dataset_specification import dataset_from_json, Constraint
 from mario.metadata import metadata_from_json
@@ -12,17 +15,29 @@ import pytest
 from mario.query_builder import ViewBasedQueryBuilder
 
 
-def test_build_and_export_hyper_as_csv():
+def setup_dataset_builder_test(test):
     dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
     metadata = metadata_from_json(os.path.join('test', 'metadata.json'))
-    configuration = Configuration(file_path=os.path.join('test', 'orders_with_nulls.hyper'))
-    extractor = HyperFile(configuration=configuration, dataset_specification=dataset, metadata=metadata)
-    builder = DatasetBuilder(dataset_specification=dataset, metadata=metadata, data=extractor)
-    output_path = os.path.join('output', 'test_build_and_export_csv')
-    path = os.path.join(output_path, 'output.csv')
-    os.makedirs(output_path, exist_ok=True)
+    output_path = os.path.join('output', test)
+    shutil.rmtree(output_path, ignore_errors=True)
+    os.makedirs(output_path)
+    shutil.copyfile(src=os.path.join('test', 'orders_with_nulls.hyper'), dst=os.path.join(output_path, 'orders_with_nulls.hyper'))
+    return output_path, dataset, metadata
 
-    # Build as a gzipped file using validation
+
+def run_consistency_checks(builder, output_path):
+    """
+    Generates outputs in various formats with various output options to check
+    they are being created consistently
+    :param builder:
+    :param output_path:
+    :return:
+    """
+
+    # CSV
+    path = os.path.join(output_path, 'output.csv')
+
+    # Build as a gzipped csv file using validation
     builder.build(file_path=path, output_format=Format.CSV, compress_using_gzip=True, validate=True, allow_nulls=True)
     df = pd.read_csv(path + '.gz')
     assert len(df) > 0
@@ -41,76 +56,69 @@ def test_build_and_export_hyper_as_csv():
     df = pd.read_csv(path)
     assert 'row_number' not in df.columns
 
+    # Now onto Hypers
+    table_name = TableName('Extract', 'Extract')
+    path = os.path.join(output_path, 'output.hyper')
+    if os.path.exists(path):
+        os.remove(path)
 
-def test_build_and_export_df_as_csv():
+    # Build hyper without allowing NULLs
+    with pytest.raises(ValueError):
+        builder.build(file_path=path, output_format=Format.HYPER, validate=True, allow_nulls=False)
+
+    # Build hyper with row numbers
+    shutil.copyfile(src=os.path.join('test', 'orders_with_nulls.hyper'), dst=os.path.join(output_path, 'orders_with_nulls.hyper'))
+    builder.build(file_path=path, output_format=Format.HYPER, allow_nulls=True, include_row_numbers=True)
+    df = pantab.frame_from_hyper(source=path, table=table_name)
+    assert 'row_number' in df.columns
+    os.remove(path)
+
+    # Build hyper without row numbers
+    shutil.copyfile(src=os.path.join('test', 'orders_with_nulls.hyper'), dst=os.path.join(output_path, 'orders_with_nulls.hyper'))
+    builder.build(file_path=path, output_format=Format.HYPER, allow_nulls=True, include_row_numbers=False)
+    df = pantab.frame_from_hyper(source=path, table=table_name)
+    assert 'row_number' not in df.columns
+
+
+def test_dataset_builder_with_hyperfile_extractor():
+    output_path, dataset, metadata = setup_dataset_builder_test('test_dataset_builder_with_hyperfile_extractor')
+
+    configuration = Configuration(file_path=os.path.join(output_path, 'orders_with_nulls.hyper'))
+    extractor = HyperFile(configuration=configuration, dataset_specification=dataset, metadata=metadata)
+    builder = DatasetBuilder(dataset_specification=dataset, metadata=metadata, data=extractor)
+
+    run_consistency_checks(builder, output_path)
+
+
+def test_dataset_builder_with_dataframe_extractor():
     from tableauhyperapi import TableName
-    dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
-    metadata = metadata_from_json(os.path.join('test', 'metadata.json'))
-    configuration = Configuration(file_path=os.path.join('test', 'orders_with_nulls.hyper'))
+    output_path, dataset, metadata = setup_dataset_builder_test('test_dataset_builder_with_dataframe_extractor')
+
+    configuration = Configuration(file_path=os.path.join(output_path, 'orders_with_nulls.hyper'))
     df = pantab.frame_from_hyper(source=configuration.file_path, table=TableName('Extract','Extract'))
     extractor = DataFrameExtractor(dataframe=df, dataset_specification=dataset, metadata=metadata)
     builder = DatasetBuilder(dataset_specification=dataset, metadata=metadata, data=extractor)
-    output_path = os.path.join('output', 'test_build_and_export_csv')
-    path = os.path.join(output_path, 'output.csv')
-    os.makedirs(output_path, exist_ok=True)
 
-    # Build as a gzipped file using validation
-    builder.build(file_path=path, output_format=Format.CSV, compress_using_gzip=True, validate=True, allow_nulls=True)
-    df = pd.read_csv(path + '.gz')
-    assert len(df) > 0
-
-    # Build without allowing NULLs
-    with pytest.raises(ValueError):
-        builder.build(file_path=path, output_format=Format.CSV, validate=True, allow_nulls=False)
-
-    # Build with row numbers
-    builder.build(file_path=path, output_format=Format.CSV, allow_nulls=True, include_row_numbers=True)
-    df = pd.read_csv(path)
-    assert 'row_number' in df.columns
-
-    # Build without row numbers
-    builder.build(file_path=path, output_format=Format.CSV, allow_nulls=True, include_row_numbers=False)
-    df = pd.read_csv(path)
-    assert 'row_number' not in df.columns
+    run_consistency_checks(builder, output_path)
 
 
-def test_build_and_export_default_as_csv():
-    dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
-    metadata = metadata_from_json(os.path.join('test', 'metadata.json'))
-    configuration = Configuration(file_path=os.path.join('test', 'orders_with_nulls.hyper'))
+def test_dataset_builder_with_default_extractor():
+    output_path, dataset, metadata = setup_dataset_builder_test('test_dataset_builder_with_default_extractor')
+
+    configuration = Configuration(file_path=os.path.join(output_path, 'orders_with_nulls.hyper'))
     extractor = DataExtractor(configuration=configuration, dataset_specification=dataset, metadata=metadata)
     builder = DatasetBuilder(dataset_specification=dataset, metadata=metadata, data=extractor)
-    output_path = os.path.join('output', 'test_build_and_export_csv')
-    path = os.path.join(output_path, 'output.csv')
-    os.makedirs(output_path, exist_ok=True)
 
-    # Build as a gzipped file using validation
-    builder.build(file_path=path, output_format=Format.CSV, compress_using_gzip=True, validate=True, allow_nulls=True)
-    df = pd.read_csv(path + '.gz')
-    assert len(df) > 0
-
-    # Build without allowing NULLs
-    with pytest.raises(ValueError):
-        builder.build(file_path=path, output_format=Format.CSV, validate=True, allow_nulls=False)
-
-    # Build with row numbers
-    builder.build(file_path=path, output_format=Format.CSV, allow_nulls=True, include_row_numbers=True)
-    df = pd.read_csv(path)
-    assert 'row_number' in df.columns
-
-    # Build without row numbers
-    builder.build(file_path=path, output_format=Format.CSV, allow_nulls=True, include_row_numbers=False)
-    df = pd.read_csv(path)
-    assert 'row_number' not in df.columns
+    run_consistency_checks(builder, output_path)
 
 
-def test_build_and_export_sql_as_csv():
+def test_dataset_builder_with_streaming_extractor():
     # Skip this test if we don't have a connection string
     if not os.environ.get('CONNECTION_STRING'):
         pytest.skip("Skipping SQL test as no database configured")
 
-    dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
-    metadata = metadata_from_json(os.path.join('test', 'metadata.json'))
+    output_path, dataset, metadata = setup_dataset_builder_test('test_dataset_builder_with_streaming_extractor')
+
     configuration = Configuration(
         connection_string=os.environ.get('CONNECTION_STRING'),
         schema="dev",
@@ -119,42 +127,22 @@ def test_build_and_export_sql_as_csv():
     )
     extractor = StreamingDataExtractor(configuration=configuration, dataset_specification=dataset, metadata=metadata)
     builder = DatasetBuilder(dataset_specification=dataset, metadata=metadata, data=extractor)
-    output_path = os.path.join('output', 'test_build_and_export_csv')
-    path = os.path.join(output_path, 'output.csv')
-    os.makedirs(output_path, exist_ok=True)
 
-    # Build as a gzipped file using validation
-    builder.build(file_path=path, output_format=Format.CSV, compress_using_gzip=True, validate=True, allow_nulls=True)
-    df = pd.read_csv(path + '.gz')
-    assert len(df) > 0
-
-    # Build without allowing NULLs
-    with pytest.raises(ValueError):
-        builder.build(file_path=path, output_format=Format.CSV, validate=True, allow_nulls=False)
-
-    # Build with row numbers
-    builder.build(file_path=path, output_format=Format.CSV, allow_nulls=True, include_row_numbers=True)
-    df = pd.read_csv(path)
-    assert 'row_number' in df.columns
-
-    # Build without row numbers
-    builder.build(file_path=path, output_format=Format.CSV, allow_nulls=True, include_row_numbers=False)
-    df = pd.read_csv(path)
-    assert 'row_number' not in df.columns
+    run_consistency_checks(builder, output_path)
 
 
-def test_build_and_export_partitioned_sql_as_csv():
+def test_dataset_builder_with_partitioning_extractor():
     # Skip this test if we don't have a connection string
     if not os.environ.get('CONNECTION_STRING'):
         pytest.skip("Skipping SQL test as no database configured")
 
-    dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
+    output_path, dataset, metadata = setup_dataset_builder_test('test_dataset_builder_with_streaming_extractor')
+
     constraint = Constraint()
     constraint.item = 'Category'
     constraint.allowed_values = ['Furniture', 'Office Supplies']
     dataset.constraints.append(constraint)
 
-    metadata = metadata_from_json(os.path.join('test', 'metadata.json'))
     configuration = Configuration(
         connection_string=os.environ.get('CONNECTION_STRING'),
         schema="dev",
@@ -163,25 +151,5 @@ def test_build_and_export_partitioned_sql_as_csv():
     )
     extractor = PartitioningExtractor(configuration=configuration, dataset_specification=dataset, metadata=metadata, partition_column='Category')
     builder = DatasetBuilder(dataset_specification=dataset, metadata=metadata, data=extractor)
-    output_path = os.path.join('output', 'test_build_and_export_csv')
-    path = os.path.join(output_path, 'output.csv')
-    os.makedirs(output_path, exist_ok=True)
 
-    # Build as a gzipped file using validation
-    builder.build(file_path=path, output_format=Format.CSV, compress_using_gzip=True, validate=True, allow_nulls=True)
-    df = pd.read_csv(path + '.gz')
-    assert len(df) > 0
-
-    # Build without allowing NULLs
-    with pytest.raises(ValueError):
-        builder.build(file_path=path, output_format=Format.CSV, validate=True, allow_nulls=False)
-
-    # Build with row numbers
-    builder.build(file_path=path, output_format=Format.CSV, allow_nulls=True, include_row_numbers=True)
-    df = pd.read_csv(path)
-    assert 'row_number' in df.columns
-
-    # Build without row numbers
-    builder.build(file_path=path, output_format=Format.CSV, allow_nulls=True, include_row_numbers=False)
-    df = pd.read_csv(path)
-    assert 'row_number' not in df.columns
+    run_consistency_checks(builder, output_path)

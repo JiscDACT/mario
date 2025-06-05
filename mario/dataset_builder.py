@@ -18,6 +18,7 @@ class Format(Enum):
     EXCEL_PIVOT = 'xlsx'
     CSV = 'csv'
     EXCEL_INFO_SHEET = 'info'
+    HYPER = 'hyper'
 
 
 class DatasetBuilder:
@@ -73,8 +74,13 @@ class DatasetBuilder:
             self.__build_excel_pivot__(file_path, template_path)
         elif output_format == Format.EXCEL_INFO_SHEET:
             self.__build_excel_info_sheet(file_path, template_path)
+        elif output_format == Format.HYPER:
+            self.__build_hyper__(file_path, **kwargs)
         else:
             raise NotImplementedError
+
+    def __build_hyper__(self, file_path: str, **kwargs):
+        self.data.save_data_as_hyper(file_path=file_path, **kwargs)
 
     def __build_excel_info_sheet(self, file_path: str, template_path: str):
         from mario.excel_builder import ExcelBuilder
