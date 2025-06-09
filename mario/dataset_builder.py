@@ -71,9 +71,9 @@ class DatasetBuilder:
         elif output_format == Format.CSV:
             self.__build_csv__(file_path, **kwargs)
         elif output_format == Format.EXCEL_PIVOT:
-            self.__build_excel_pivot__(file_path, template_path)
+            self.__build_excel_pivot__(file_path, **kwargs)
         elif output_format == Format.EXCEL_INFO_SHEET:
-            self.__build_excel_info_sheet(file_path, template_path)
+            self.__build_excel_info_sheet(file_path, **kwargs)
         elif output_format == Format.HYPER:
             self.__build_hyper__(file_path, **kwargs)
         else:
@@ -82,18 +82,18 @@ class DatasetBuilder:
     def __build_hyper__(self, file_path: str, **kwargs):
         self.data.save_data_as_hyper(file_path=file_path, **kwargs)
 
-    def __build_excel_info_sheet(self, file_path: str, template_path: str):
+    def __build_excel_info_sheet(self, file_path: str, **kwargs):
         from mario.excel_builder import ExcelBuilder
         excel_builder = ExcelBuilder(
             output_file_path=file_path,
             dataset_specification=self.dataset_specification,
             metadata=self.metadata,
             data_extractor=self.data,
-            template_path=template_path
+            **kwargs
         )
         excel_builder.create_notes_only()
 
-    def __build_excel_pivot__(self, file_path: str, template_path: str):
+    def __build_excel_pivot__(self, file_path: str, **kwargs):
         from mario.excel_builder import ExcelBuilder
         if self.data.get_total() > 1000000:
             logger.warning("The dataset is larger than 1m rows; this isn't supported in Excel format")
@@ -102,7 +102,7 @@ class DatasetBuilder:
             dataset_specification=self.dataset_specification,
             metadata=self.metadata,
             data_extractor=self.data,
-            template_path=template_path
+            **kwargs
         )
         excel_builder.create_workbook()
 
