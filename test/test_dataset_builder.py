@@ -79,6 +79,39 @@ def run_consistency_checks(builder, output_path):
     df = pantab.frame_from_hyper(source=path, table=table_name)
     assert 'row_number' not in df.columns
 
+    # Excel
+    path = os.path.join(output_path, 'output.xlsx')
+
+    #
+    # Currently the Excel builder relies on get_data_frame() which isn't supported
+    # with streaming-based extractors, so we need to see if its supported
+    #
+    streaming = False
+    try:
+        builder.data.get_data_frame()
+    except NotImplementedError:
+        streaming = True
+
+    if not streaming:
+        # Build without allowing NULLs
+        with pytest.raises(ValueError):
+            builder.build(file_path=path, output_format=Format.EXCEL_PIVOT, validate=True, allow_nulls=False)
+
+        # Build with row numbers
+        builder.build(file_path=path, output_format=Format.EXCEL_PIVOT, allow_nulls=True, include_row_numbers=True)
+        df = pd.read_excel(path)
+        assert 'row_number' in df.columns
+
+        # Build without row numbers
+        builder.build(file_path=path, output_format=Format.EXCEL_PIVOT, allow_nulls=True, include_row_numbers=False)
+        df = pd.read_excel(path)
+        assert 'row_number' not in df.columns
+
+        # Build with defaults
+        builder.build(file_path=path, output_format=Format.EXCEL_PIVOT)
+        df = pd.read_excel(path)
+        assert 'row_number' not in df.columns
+
 
 def test_dataset_builder_with_hyperfile_extractor():
     output_path, dataset, metadata = setup_dataset_builder_test('test_dataset_builder_with_hyperfile_extractor')
