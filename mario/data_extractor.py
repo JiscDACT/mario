@@ -403,6 +403,7 @@ class StreamingDataExtractor(DataExtractor):
                 if options.minimise:
                     self.__minimise_data__()
                     df = self._data
+                self._data = None
                 if options.include_row_numbers:
                     df['row_number'] = range(row_counter, row_counter + len(df))
                     row_counter += len(df)  # Update the counter
@@ -428,6 +429,7 @@ class StreamingDataExtractor(DataExtractor):
                 if options.minimise:
                     self.__minimise_data__()
                     df = self._data
+                self._data = None
             if options.include_row_numbers:
                 df['row_number'] = range(row_counter, row_counter + len(df))
                 row_counter += len(df)  # Update the counter
@@ -661,6 +663,7 @@ class PartitioningExtractor(StreamingDataExtractor):
                     if options.minimise:
                         self.__minimise_data__()
                         df = self._data
+                    self._data = None
                 if options.include_row_numbers:
                     df['row_number'] = range(row_counter, row_counter + len(df))
                     row_counter += len(df)  # Update the counter
