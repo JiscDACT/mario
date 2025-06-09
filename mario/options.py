@@ -34,3 +34,9 @@ class HyperOptions(OutputOptions):
         super().__init__(**kwargs)
         self.table = kwargs.get('table', 'Extract')
         self.schema = kwargs.get('schema', 'Extract')
+
+
+class ExcelOptions(OutputOptions):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.template_path = kwargs.get('template_path', 'excel_template.xlsx')
