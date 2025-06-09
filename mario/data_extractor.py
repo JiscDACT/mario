@@ -151,11 +151,15 @@ class DataExtractor:
         )
         return validator.validate_data(allow_nulls)
 
-    def get_data_frame(self, minimise=True) -> DataFrame:
+    def get_data_frame(self, minimise=True, include_row_numbers=False) -> DataFrame:
         if self._data is None:
             self.__load__()
         if minimise:
             self.__minimise_data__()
+        if include_row_numbers:
+            self.__add_row_numbers__()
+        else:
+            self.__drop_row_numbers__()
         return self._data
 
     def __add_row_numbers__(self):
@@ -313,11 +317,11 @@ class StreamingDataExtractor(DataExtractor):
         super().__init__(configuration, dataset_specification, metadata)
         self._data = None
 
-    def get_data_frame(self, minimise=True) -> DataFrame:
+    def get_data_frame(self, minimise=True, include_row_numbers=False) -> DataFrame:
         if self._data is None:
             raise NotImplementedError("Dataframe is not available when using a streaming extractor")
         else:
-            return super().get_data_frame(minimise=minimise)
+            return super().get_data_frame(minimise=minimise, include_row_numbers=include_row_numbers)
 
     def validate_data(self, allow_nulls=True):
         if self._data is None:
@@ -596,7 +600,7 @@ class PartitioningExtractor(StreamingDataExtractor):
         for value in self.__get_partition_values__():
             self.__load_from_sql_using_partition__(partition_value=value)
 
-    def get_data_frame(self, minimise=True) -> DataFrame:
+    def get_data_frame(self, minimise=True, include_row_numbers=False) -> DataFrame:
         raise NotImplementedError()
 
     def get_total(self, measure=None):
