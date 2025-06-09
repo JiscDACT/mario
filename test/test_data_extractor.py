@@ -127,9 +127,10 @@ def test_stream_sql_to_csv_with_compression():
         metadata=metadata,
         configuration=configuration
     )
-    file = tempfile.NamedTemporaryFile(suffix='.csv')
-    gzip_path = extractor.stream_sql_to_csv(file_path=file.name, chunk_size=1000, compress_using_gzip=True)
-    df = pd.read_csv(gzip_path)
+    with tempfile.TemporaryDirectory() as temp_dir:
+        file = os.path.join(temp_dir, 'test.csv')
+        gzip_path = extractor.stream_sql_to_csv(file_path=file, chunk_size=1000, compress_using_gzip=True)
+        df = pd.read_csv(gzip_path)
     assert len(df) == 10194
 
 
@@ -624,16 +625,22 @@ def test_partitioning_extractor_with_row_numbers():
     )
 
     path = os.path.join('output', 'test_partitioning_extractor_with_row_numbers')
+    os.makedirs(path, exist_ok=True)
+
     file = os.path.join(path, 'test.hyper')
     csv_file = os.path.join(path, 'test.csv')
 
-    os.makedirs(path, exist_ok=True)
+    # drop existing
+    for path in [file, csv_file]:
+        if os.path.exists(path):
+            os.remove(path)
 
     extractor.stream_sql_to_hyper(
         file_path=file,
         include_row_numbers=True
     )
-    # Check row_number in hyper output
+
+    # Check row_number is in hyper output
     assert 'row_number' in get_column_list(hyper_file_path=file, schema='Extract', table='Extract')
 
     # Load it up and export a CSV

@@ -3,6 +3,7 @@ Hyper utility functions
 """
 import logging
 from typing import List
+from mario.options import CsvOptions, HyperOptions
 
 log = logging.getLogger(__name__)
 
@@ -277,3 +278,82 @@ def concatenate_hypers(hyper_file_path1, hyper_file_path2, output_hyper_file_pat
 
     df_merged = pd.concat([df1, df2], axis=1)
     frame_to_hyper(df=df_merged, database=output_hyper_file_path, table=TableName(schema, table))
+
+
+def save_hyper_as_hyper(hyper_file, file_path, **kwargs):
+    import shutil
+    shutil.copyfile(hyper_file, file_path)
+
+
+def save_hyper_as_csv(hyper_file: str, file_path: str, **kwargs):
+    import pantab
+    import tempfile
+    import shutil
+    import os
+
+    options = CsvOptions(**kwargs)
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_hyper = os.path.join(temp_dir, 'temp.hyper')
+        shutil.copyfile(
+            src=hyper_file,
+            dst=temp_hyper
+        )
+
+        schema, table = get_default_table_and_schema(temp_hyper)
+
+        columns = get_column_list(
+            hyper_file_path=temp_hyper,
+            schema=schema,
+            table=table
+        )
+
+        if 'row_number' not in columns:
+            log.debug("Adding row numbers to hyper so we can guarantee ordering")
+            add_row_numbers_to_hyper(
+                input_hyper_file_path=temp_hyper,
+                schema=schema,
+                table=table
+            )
+        else:
+            log.debug("Data source already contains row numbers")
+
+        if options.include_row_numbers is False and 'row_number' in columns:
+            columns.remove('row_number')
+        elif options.include_row_numbers is True and 'row_number' not in columns:
+            columns.append('row_number')
+
+        if options.compress_using_gzip:
+            compression_options = dict(method='gzip')
+            file_path = file_path + '.gz'
+        elif file_path.endswith('.gz'):
+            compression_options = dict(method='gzip')
+        else:
+            compression_options = None
+
+        mode = 'w'
+        header = True
+        offset = 0
+        column_names = ','.join(f'"{column}"' for column in columns)
+
+        sql = f"SELECT {column_names} FROM \"{schema}\".\"{table}\" ORDER BY row_number"
+
+        while True:
+            query = f"{sql} LIMIT {options.chunk_size} OFFSET {offset}"
+            df_chunk = pantab.frame_from_hyper_query(temp_hyper, query)
+            if df_chunk.empty:
+                break
+            df_chunk.to_csv(file_path, index=False, mode=mode, header=header,
+                            compression=compression_options)
+            offset += options.chunk_size
+            if header:
+                header = False
+                mode = "a"
+
+
+def save_dataframe_as_hyper(df, file_path, **kwargs):
+    from tableauhyperapi import TableName
+    import pantab
+    options = HyperOptions(**kwargs)
+    table_name = TableName(options.schema, options.table)
+    pantab.frame_to_hyper(df=df, database=file_path, table=table_name)

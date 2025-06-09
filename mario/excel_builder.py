@@ -8,6 +8,7 @@ from pandas import DataFrame
 from mario.data_extractor import DataExtractor
 from mario.dataset_specification import DatasetSpecification
 from mario.metadata import Metadata
+from mario.options import ExcelOptions
 
 logger = logging.getLogger(__name__)
 style_attrs = ["alignment", "border", "fill", "font", "number_format", "protection"]
@@ -33,15 +34,14 @@ class ExcelBuilder(object):
                  data_extractor: DataExtractor,
                  dataset_specification: DatasetSpecification,
                  metadata: Metadata,
-                 template_path: str
+                 **kwargs
                  ):
+
         self.data_extractor = data_extractor
         self.dataset_specification = dataset_specification
         self.metadata = metadata
         self.filepath = output_file_path
-        self.template = "excel_template.xlsx"
-        if template_path is not None:
-            self.template = template_path
+        self.options = ExcelOptions(**kwargs)
         self.workbook = None
         self.rows = None
         self.cols = None
@@ -53,7 +53,7 @@ class ExcelBuilder(object):
         Creates a write-only workbook and builds
         content in streaming mode to conserve memory
         """
-        template_workbook = load_workbook(self.template)
+        template_workbook = load_workbook(self.options.template_path)
         template_workbook.save(self.filepath)
 
         if create_notes_page:
@@ -129,7 +129,7 @@ class ExcelBuilder(object):
         """
         Create a Notes page only, to accompany CSV outputs
         """
-        self.workbook = load_workbook(self.template)
+        self.workbook = load_workbook(self.options.template_path)
         self.__update_notes__(data_format=data_format, ws=self.workbook.get_sheet_by_name('Notes'))
         self.workbook.remove(self.workbook.get_sheet_by_name('Data'))
         self.workbook.remove(self.workbook.get_sheet_by_name('Pivot'))
@@ -139,7 +139,15 @@ class ExcelBuilder(object):
             self.workbook.save(filename=self.filepath)
 
     def __create_data_page__(self):
-        df: DataFrame = self.data_extractor.get_data_frame()
+
+        if self.options.validate:
+            if not self.data_extractor.validate_data(allow_nulls=self.options.allow_nulls):
+                raise ValueError("Validation error")
+
+        df: DataFrame = self.data_extractor.get_data_frame(
+            minimise=self.options.minimise,
+            include_row_numbers=self.options.include_row_numbers
+        )
 
         # Reorder the columns to put the measure in col #1
         cols = df.columns.tolist()

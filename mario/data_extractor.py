@@ -1,5 +1,4 @@
 import logging
-import shutil
 import tempfile
 
 import pandas as pd
@@ -7,6 +6,7 @@ from pandas import DataFrame
 
 from mario.dataset_specification import DatasetSpecification
 from mario.metadata import Metadata
+from mario.options import CsvOptions, HyperOptions
 
 logger = logging.getLogger(__name__)
 
@@ -142,19 +142,36 @@ class DataExtractor:
 
     def validate_data(self, allow_nulls=True):
         from mario.validation import DataFrameValidator
+        if self._data is None:
+            self.get_data_frame()
         validator = DataFrameValidator(
             self.dataset_specification,
             self.metadata,
-            data=self.get_data_frame()
+            data=self._data
         )
         return validator.validate_data(allow_nulls)
 
-    def get_data_frame(self, minimise=True) -> DataFrame:
+    def get_data_frame(self, minimise=True, include_row_numbers=False) -> DataFrame:
         if self._data is None:
             self.__load__()
         if minimise:
             self.__minimise_data__()
+        if include_row_numbers:
+            self.__add_row_numbers__()
+        else:
+            self.__drop_row_numbers__()
         return self._data
+
+    def __add_row_numbers__(self):
+        if self._data is None:
+            self.__load__()
+        self._data['row_number'] = range(len(self._data))
+
+    def __drop_row_numbers__(self):
+        if self._data is None:
+            self.__load__()
+        if 'row_number' in self._data.columns:
+            self._data = self._data .drop(columns=['row_number'])
 
     def save_query(self, file_path: str, formatted: bool = False):
         """
@@ -172,22 +189,39 @@ class DataExtractor:
         with open(file_path, mode='w') as file:
             file.write(sql)
 
-    def save_data_as_csv(self, file_path: str, minimise=True, compress_using_gzip=False):
+    def save_data_as_csv(self, file_path: str, **kwargs):
+        options = CsvOptions(**kwargs)
         if self._data is None:
             self.__load__()
-        if minimise:
+        if options.include_row_numbers:
+            self.__add_row_numbers__()
+        else:
+            self.__drop_row_numbers__()
+        if options.minimise:
             self.__minimise_data__()
-        self._data.to_csv(file_path)
+        if options.validate:
+            self.validate_data(allow_nulls=options.allow_nulls)
+        if options.compress_using_gzip:
+            compression_options = dict(method='gzip')
+            file_path = file_path + '.gz'
+        else:
+            compression_options = None
+        self._data.to_csv(file_path, index=False, compression=compression_options)
 
-    def save_data_as_hyper(self, file_path: str, table: str = 'Extract', schema: str = 'Extract', minimise=True):
-        import pantab
-        from tableauhyperapi import TableName
+    def save_data_as_hyper(self, file_path: str, **kwargs):
+        from mario.hyper_utils import save_dataframe_as_hyper
+        options = HyperOptions(**kwargs)
         if self._data is None:
             self.__load__()
-        table_name = TableName(schema, table)
-        if minimise:
+        if options.include_row_numbers:
+            self.__add_row_numbers__()
+        else:
+            self.__drop_row_numbers__()
+        if options.minimise:
             self.__minimise_data__()
-        pantab.frame_to_hyper(df=self._data, database=file_path, table=table_name)
+        if options.validate:
+            self.validate_data(allow_nulls=options.allow_nulls)
+        save_dataframe_as_hyper(df=self._data, file_path=file_path, **kwargs)
 
 
 class HyperFile(DataExtractor):
@@ -239,75 +273,34 @@ class HyperFile(DataExtractor):
                 measure=measure
             )
 
-    def save_data_as_hyper(self, file_path: str, table: str = 'Extract', schema: str = 'Extract', minimise=False):
-        if minimise:
+    def save_data_as_hyper(self, file_path: str, **kwargs):
+        from mario.hyper_utils import save_hyper_as_hyper, add_row_numbers_to_hyper, get_default_table_and_schema
+        options = HyperOptions(**kwargs)
+        if options.minimise:
             self.__minimise_data__()
-        shutil.copyfile(self.configuration.file_path, file_path)
-
-    def save_data_as_csv(self,
-                         file_path: str,
-                         minimise=True,
-                         compress_using_gzip=False,
-                         chunk_size=100000
-                         ):
-        from mario.hyper_utils import get_default_table_and_schema, add_row_numbers_to_hyper, get_column_list
-        import pantab
-        import tempfile
-        import shutil
-        import os
-
-        with tempfile.TemporaryDirectory() as temp_dir:
-            temp_hyper = os.path.join(temp_dir, 'temp.hyper')
-            shutil.copyfile(
-                src=self.configuration.file_path,
-                dst=temp_hyper
-            )
-
-            schema, table = get_default_table_and_schema(temp_hyper)
-
-            columns = get_column_list(
-                hyper_file_path=temp_hyper,
+        if options.validate:
+            self.validate_data(allow_nulls=options.allow_nulls)
+        if options.include_row_numbers:
+            schema, table = get_default_table_and_schema(self.configuration.file_path)
+            add_row_numbers_to_hyper(
+                input_hyper_file_path=self.configuration.file_path,
                 schema=schema,
                 table=table
             )
+        save_hyper_as_hyper(hyper_file=self.configuration.file_path, file_path=file_path, **kwargs)
 
-            logger.debug("Adding row numbers to hyper so we can guarantee ordering")
-            if 'row_number' not in columns:
-                add_row_numbers_to_hyper(
-                    input_hyper_file_path=temp_hyper,
-                    schema=schema,
-                    table=table
-                )
-            else:
-                # Remove it so we don't include it in the output
-                columns.remove('row_number')
-
-            if compress_using_gzip:
-                compression_options = dict(method='gzip')
-                file_path = file_path + '.gz'
-            elif file_path.endswith('.gz'):
-                compression_options = dict(method='gzip')
-            else:
-                compression_options = None
-
-            mode = 'w'
-            header = True
-            offset = 0
-            column_names = ','.join(f'"{column}"' for column in columns)
-
-            sql = f"SELECT {column_names} FROM \"{schema}\".\"{table}\" ORDER BY row_number"
-
-            while True:
-                query = f"{sql} LIMIT {chunk_size} OFFSET {offset}"
-                df_chunk = pantab.frame_from_hyper_query(temp_hyper, query)
-                if df_chunk.empty:
-                    break
-                df_chunk.to_csv(file_path, index=False, mode=mode, header=header,
-                                compression=compression_options)
-                offset += chunk_size
-                if header:
-                    header = False
-                    mode = "a"
+    def save_data_as_csv(self,file_path: str, **kwargs):
+        from mario.hyper_utils import save_hyper_as_csv
+        options = CsvOptions(**kwargs)
+        if options.minimise:
+            self.__minimise_data__()
+        if options.validate:
+            self.validate_data(allow_nulls=options.allow_nulls)
+        save_hyper_as_csv(
+            hyper_file=self.configuration.file_path,
+            file_path=file_path,
+            **kwargs
+        )
 
 
 class StreamingDataExtractor(DataExtractor):
@@ -324,11 +317,11 @@ class StreamingDataExtractor(DataExtractor):
         super().__init__(configuration, dataset_specification, metadata)
         self._data = None
 
-    def get_data_frame(self, minimise=True) -> DataFrame:
+    def get_data_frame(self, minimise=True, include_row_numbers=False) -> DataFrame:
         if self._data is None:
             raise NotImplementedError("Dataframe is not available when using a streaming extractor")
         else:
-            return super().get_data_frame(minimise=minimise)
+            return super().get_data_frame(minimise=minimise, include_row_numbers=include_row_numbers)
 
     def validate_data(self, allow_nulls=True):
         if self._data is None:
@@ -351,18 +344,19 @@ class StreamingDataExtractor(DataExtractor):
         connection = engine.connect().execution_options(stream_results=True)
         return connection
 
-    def save_data_as_csv(self, file_path: str, minimise=False, compress_using_gzip=False):
-        if minimise:
+    def save_data_as_csv(self, file_path: str, **kwargs):
+        options = CsvOptions(**kwargs)
+        if options.minimise:
             raise NotImplementedError('Cannot minimise data when using streaming')
-        self.stream_sql_to_csv(file_path=file_path, compress_using_gzip=compress_using_gzip)
+        self.stream_sql_to_csv(file_path=file_path, **kwargs)
 
-    def save_data_as_hyper(self, file_path: str, table: str = 'Extract', schema: str = 'Extract', minimise=False):
-        if minimise:
+    def save_data_as_hyper(self, file_path: str, **kwargs):
+        options = HyperOptions(**kwargs)
+        if options.minimise:
             raise NotImplementedError('Cannot minimise data when using streaming')
         self.stream_sql_to_hyper(
             file_path=file_path,
-            table=table,
-            schema=schema
+            **kwargs
         )
 
     def get_total(self, measure=None):
@@ -386,54 +380,39 @@ class StreamingDataExtractor(DataExtractor):
         totals_df = pd.read_sql(totals_query[0], self.get_connection(), params=totals_query[1])
         return totals_df.iat[0, 0]
 
-    def stream_sql_to_hyper(self,
-                            file_path: str,
-                            table: str = 'Extract',
-                            schema: str = 'Extract',
-                            validate: bool = False,
-                            allow_nulls: bool = True,
-                            minimise: bool = False,
-                            chunk_size: int = 100000):
+    def stream_sql_to_hyper(self, file_path: str, **kwargs):
         """
         Write From SQL to .hyper using streaming. No data is held in memory
         apart from chunks of rows as they are read.
         Optionally, data can be validated as it is read.
         """
+        options = HyperOptions(**kwargs)
         self.__build_query__()
         logger.info("Executing query")
         from tableauhyperapi import TableName
         from pantab import frame_to_hyper
 
         connection = self.get_connection()
-        table_name = TableName(schema, table)
-        for df in pd.read_sql(self._query[0], connection, chunksize=chunk_size):
-            if validate or minimise:
+        table_name = TableName(options.schema, options.table)
+        row_counter = 0
+        for df in pd.read_sql(self._query[0], connection, chunksize=options.chunk_size):
+            if options.validate or options.minimise or options.include_row_numbers:
                 self._data = df
-                if validate:
-                    self.validate_data(allow_nulls=allow_nulls)
-                if minimise:
+                if options.validate:
+                    self.validate_data(allow_nulls=options.allow_nulls)
+                if options.minimise:
                     self.__minimise_data__()
                     df = self._data
+                self._data = None
+                if options.include_row_numbers:
+                    df['row_number'] = range(row_counter, row_counter + len(df))
+                    row_counter += len(df)  # Update the counter
             frame_to_hyper(df, database=file_path, table=table_name, table_mode='a')
 
-    def stream_sql_to_csv(self,
-                          file_path,
-                          validate: bool = False,
-                          allow_nulls: bool = True,
-                          chunk_size: int = 100000,
-                          compress_using_gzip: bool = False,
-                          minimise: bool = False
-                          ):
-        """
-        Write From SQL to CSV using streaming. No data is held in memory
-        apart from chunks of rows as they are read.
-        Optionally, data can be validated as it is read.
-        """
-        self.__build_query__()
-        logger.info("Executing query")
-        connection = self.get_connection()
-
-        if compress_using_gzip:
+    def stream_sql_query_to_csv(self, file_path, query, connection, row_counter=0, **kwargs) -> int:
+        from mario.query_builder import get_formatted_query
+        options = CsvOptions(**kwargs)
+        if options.compress_using_gzip:
             compression_options = dict(method='gzip')
             file_path = file_path + '.gz'
         else:
@@ -441,19 +420,46 @@ class StreamingDataExtractor(DataExtractor):
 
         mode = 'w'
         header = True
-        for df in pd.read_sql(self._query[0], connection, chunksize=chunk_size):
-            if validate or minimise:
+
+        for df in pd.read_sql(get_formatted_query(query[0], query[1]), connection, chunksize=options.chunk_size):
+            if options.validate or options.minimise:
                 self._data = df
-                if validate:
-                    self.validate_data(allow_nulls=allow_nulls)
-                if minimise:
+                if options.validate:
+                    self.validate_data(allow_nulls=options.allow_nulls)
+                if options.minimise:
                     self.__minimise_data__()
                     df = self._data
+                self._data = None
+            if options.include_row_numbers:
+                df['row_number'] = range(row_counter, row_counter + len(df))
+                row_counter += len(df)  # Update the counter
             df.to_csv(file_path, mode=mode, header=header, index=False, compression=compression_options)
             if header:
                 header = False
                 mode = "a"
 
+        return row_counter
+
+    def stream_sql_to_csv(self, file_path, **kwargs):
+        """
+        Write From SQL to CSV using streaming. No data is held in memory
+        apart from chunks of rows as they are read.
+        Optionally, data can be validated as it is read.
+        """
+        self.__build_query__()
+        options = CsvOptions(**kwargs)
+        logger.info("Executing query")
+        connection = self.get_connection()
+
+        self.stream_sql_query_to_csv(
+            file_path=file_path,
+            query=self._query,
+            connection=connection,
+            row_counter=0,
+            **kwargs
+        )
+        if options.compress_using_gzip:
+            file_path = file_path + '.gz'
         return file_path
 
     def stream_sql_to_csv_using_bcp(self,
@@ -534,7 +540,7 @@ class DataFrameExtractor(DataExtractor):
         self._data = dataframe
 
 
-class PartitioningExtractor(DataExtractor):
+class PartitioningExtractor(StreamingDataExtractor):
     """
     A data extractor that loads from SQL in batches using a specified constraint
     to partition by
@@ -548,16 +554,6 @@ class PartitioningExtractor(DataExtractor):
         super().__init__(configuration, dataset_specification, metadata)
         self._data = None
         self.partition_column = partition_column
-
-    def get_connection(self):
-        from sqlalchemy import create_engine
-
-        if self.configuration.hook is not None:
-            return self.configuration.hook.get_conn()
-
-        engine = create_engine(self.configuration.connection_string)
-        connection = engine.connect().execution_options(stream_results=True)
-        return connection
 
     def __get_partition_values__(self):
         for constraint in self.dataset_specification.constraints:
@@ -606,85 +602,40 @@ class PartitioningExtractor(DataExtractor):
         for value in self.__get_partition_values__():
             self.__load_from_sql_using_partition__(partition_value=value)
 
-    def get_data_frame(self, minimise=True) -> DataFrame:
+    def get_data_frame(self, minimise=True, include_row_numbers=False) -> DataFrame:
         raise NotImplementedError()
 
     def get_total(self, measure=None):
         raise NotImplementedError()
 
-    def save_data_as_hyper(self,
-                           file_path: str,
-                           table: str = 'Extract',
-                           schema: str = 'Extract',
-                           minimise=True):
-        self.stream_sql_to_hyper(file_path=file_path, table=table, schema=schema, minimise=minimise)
+    def save_data_as_hyper(self, file_path: str, **kwargs):
+        self.stream_sql_to_hyper(file_path=file_path, **kwargs)
 
-    def save_data_as_csv(self, file_path: str, minimise=True, compress_using_gzip=False):
-        self.stream_sql_to_csv(
-            file_path=file_path,
-            minimise=minimise,
-            compress_using_gzip=compress_using_gzip
-        )
+    def save_data_as_csv(self, file_path: str, **kwargs):
+        self.stream_partition_sql_to_csv(file_path=file_path, **kwargs)
 
-    def stream_sql_to_csv(self,
-                          file_path,
-                          validate: bool = False,
-                          allow_nulls: bool = True,
-                          chunk_size: int = 100000,
-                          compress_using_gzip: bool = False,
-                          minimise: bool = False,
-                          include_row_numbers: bool = False
-                          ):
+    def stream_partition_sql_to_csv(self, file_path, **kwargs):
         """
         Write From SQL to CSV using streaming. No data is held in memory
         apart from chunks of rows as they are read.
         Optionally, data can be validated as it is read.
         """
-        from mario.query_builder import get_formatted_query
         logger.info("Executing query")
         connection = self.get_connection()
-
-        if compress_using_gzip:
-            compression_options = dict(method='gzip')
-            file_path = file_path + '.gz'
-        else:
-            compression_options = None
-
-        mode = 'w'
-        header = True
-
         row_counter = 0  # Initialize global row counter
-
         for partition_value in self.__get_partition_values__():
             query = self.__build_query_using_partition__(partition_value=partition_value)
-            for df in pd.read_sql(get_formatted_query(query[0],query[1]), connection, chunksize=chunk_size):
-                if validate or minimise:
-                    self._data = df
-                    if validate:
-                        self.validate_data(allow_nulls=allow_nulls)
-                    if minimise:
-                        self.__minimise_data__()
-                        df = self._data
-                if include_row_numbers:
-                    df['row_number'] = range(row_counter, row_counter + len(df))
-                    row_counter += len(df)  # Update the counter
-                df.to_csv(file_path, mode=mode, header=header, index=False, compression=compression_options)
-                if header:
-                    header = False
-                    mode = "a"
+            row_counter = self.stream_sql_query_to_csv(
+                connection=connection,
+                query=query,
+                file_path=file_path,
+                row_counter=row_counter,
+                **kwargs
+            )
 
         return file_path
 
-    def stream_sql_to_hyper(self,
-                            file_path: str,
-                            table: str = 'Extract',
-                            schema: str = 'Extract',
-                            validate: bool = False,
-                            allow_nulls: bool = True,
-                            minimise: bool = False,
-                            chunk_size: int = 100000,
-                            include_row_numbers: bool = False
-                            ):
+    def stream_sql_to_hyper(self, file_path: str, **kwargs):
         """
         Write From SQL to .hyper using streaming. No data is held in memory
         apart from chunks of rows as they are read.
@@ -696,28 +647,30 @@ class PartitioningExtractor(DataExtractor):
         from pantab import frame_to_hyper
         from mario.query_builder import get_formatted_query
 
+        options = HyperOptions(**kwargs)
         connection = self.get_connection()
-        table_name = TableName(schema, table)
+        table_name = TableName(options.schema, options.table)
 
         row_counter = 0  # Initialize global row counter
 
         for partition_value in self.__get_partition_values__():
             query = self.__build_query_using_partition__(partition_value=partition_value)
-            for df in pd.read_sql(get_formatted_query(query[0], query[1]), connection, chunksize=chunk_size):
-                if validate or minimise:
+            for df in pd.read_sql(get_formatted_query(query[0], query[1]), connection, chunksize=options.chunk_size):
+                if options.validate or options.minimise:
                     self._data = df
-                    if validate:
-                        self.validate_data(allow_nulls=allow_nulls)
-                    if minimise:
+                    if options.validate:
+                        self.validate_data(allow_nulls=options.allow_nulls)
+                    if options.minimise:
                         self.__minimise_data__()
                         df = self._data
-                if include_row_numbers:
+                    self._data = None
+                if options.include_row_numbers:
                     df['row_number'] = range(row_counter, row_counter + len(df))
                     row_counter += len(df)  # Update the counter
                 if len(df) == 0:
                     logger.warning(f"No rows found for partition with value '{partition_value}'")
                 else:
-                    logger.info(f"Saving {chunk_size} rows to file")
+                    logger.info(f"Saving {options.chunk_size} rows to file")
                     frame_to_hyper(df, database=file_path, table=table_name, table_mode='a')
 
 
