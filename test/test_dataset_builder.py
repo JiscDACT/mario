@@ -186,3 +186,30 @@ def test_dataset_builder_with_partitioning_extractor():
     builder = DatasetBuilder(dataset_specification=dataset, metadata=metadata, data=extractor)
 
     run_consistency_checks(builder, output_path)
+
+@pytest.mark.skip(reason='test manually')
+def test_hyper_to_pivot():
+    dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
+    dataset.measures = []
+    metadata = metadata_from_json(os.path.join('test', 'metadata.json'))
+    configuration = Configuration(
+        file_path=os.path.join('test', 'orders.hyper')
+    )
+    extractor = HyperFile(
+        dataset_specification=dataset,
+        metadata=metadata,
+        configuration=configuration
+    )
+    output_folder = os.path.join('output', 'test_hyper_to_pivot')
+    os.makedirs(output_folder, exist_ok=True)
+    output_file = os.path.join(output_folder, 'orders.xlsx')
+    dataset_builder = DatasetBuilder(
+        metadata=metadata,
+        dataset_specification=dataset,
+        data=extractor
+    )
+    dataset_builder.build(
+        file_path=output_file,
+        output_format=Format.EXCEL_PIVOT,
+        template_path='excel_template.xlsx',
+    )

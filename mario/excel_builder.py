@@ -194,4 +194,4 @@ class ExcelBuilder(object):
         Determine the cell range based on the dataset size
         :return: a cell range e.g "A1:C26"
         """
-        return 'A1' + ':' + chr(ord('@') + self.cols) + str(self.rows)
+        return 'A1' + ':' + chr(ord('@') + self.cols) + str(self.rows + 1)
