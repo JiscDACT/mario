@@ -65,7 +65,7 @@ class DatasetBuilder:
                     if 'hierarchies' in item.properties:
                         item.set_property('hierarchies',  [h for h in item.get_property('hierarchies') if h['hierarchy'] != hierarchy])
 
-    def build(self, output_format: Format, file_path: str, template_path: str = None, **kwargs):
+    def build(self, output_format: Format, file_path: str, **kwargs):
         if output_format == Format.TABLEAU_PACKAGED_DATASOURCE:
             self.__build_tdsx__(file_path, **kwargs)
         elif output_format == Format.CSV:

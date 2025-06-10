@@ -1,4 +1,5 @@
 import shutil
+import tempfile
 
 import pandas as pd
 import pantab
@@ -213,3 +214,33 @@ def test_hyper_to_pivot():
         output_format=Format.EXCEL_PIVOT,
         template_path='excel_template.xlsx',
     )
+
+
+def test_dataset_builder_use_temp_dir():
+    dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
+    dataset.measures = []
+    metadata = metadata_from_json(os.path.join('test', 'metadata.json'))
+    configuration = Configuration(
+        file_path=os.path.join('test', 'orders.hyper')
+    )
+    extractor = HyperFile(
+        dataset_specification=dataset,
+        metadata=metadata,
+        configuration=configuration
+    )
+    with tempfile.TemporaryDirectory() as temp_dir:
+        output_folder = os.path.join(temp_dir, 'test_hyper_to_pivot')
+        os.makedirs(output_folder, exist_ok=True)
+        output_file = os.path.join(output_folder, 'orders.xlsx')
+
+        shutil.copyfile(src='excel_template.xlsx', dst=os.path.join(temp_dir, 'excel_template_copy.xlsx'))
+        dataset_builder = DatasetBuilder(
+            metadata=metadata,
+            dataset_specification=dataset,
+            data=extractor
+        )
+        dataset_builder.build(
+            file_path=output_file,
+            output_format=Format.EXCEL_PIVOT,
+            template_path=os.path.join(temp_dir,'excel_template_copy.xlsx'),
+        )
