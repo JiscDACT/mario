@@ -18,6 +18,7 @@ def test_import_dataset_from_manifest():
 
     assert specification.name == 'test@jisc.ac.uk'
     assert specification.collection == 'manifest_test'
+    assert specification.get_property('customerEmail') == 'test@customer.ac.uk'
 
 
 def test_import_dataset_from_excel():
