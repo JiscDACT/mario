@@ -1,5 +1,6 @@
 {
     "client": "test@jisc.ac.uk",
+    "customerEmail": "test@customer.ac.uk",
     "customerRef": "test",
     "datasource": "Student full-person equivalent (FPE)", 
     "items": [
