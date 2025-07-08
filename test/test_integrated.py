@@ -249,7 +249,7 @@ def test_hyper_with_csv_output():
 
 
 def test_hyper_with_compressed_csv_output():
-    folder = os.path.join('output', 'test_integration_hyper_with_csv_output')
+    folder = os.path.join('output', 'test_integration_hyper_with_compressed_csv_output')
     os.makedirs(folder, exist_ok=True)
     dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
     metadata = metadata_from_json(os.path.join('test', 'metadata.json'))
@@ -266,6 +266,5 @@ def test_hyper_with_compressed_csv_output():
         metadata=metadata,
         data=extractor
     )
-    builder.build(Format.CSV, file_path=os.path.join(folder, 'test.csv'))
-    builder.data.save_data_as_csv(file_path=os.path.join(folder, 'test.csv'), compress_using_gzip=True)
+    builder.build(Format.CSV, file_path=os.path.join(folder, 'test.csv'), compress_using_gzip=True)
     assert os.path.exists(os.path.join(folder, 'test.csv.gz'))
