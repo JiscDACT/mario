@@ -153,7 +153,7 @@ def metadata_from_manifest(file_path=None) -> Metadata:
         metadata_item.name = item[name]
         if 'description' in item:
             metadata_item.description = item['description']
-        metadata_item.add_properties(source=item, exclude=[name, 'description'])
+        metadata_item.add_properties(source=item, exclude=[name])
         metadata.add_item(metadata_item)
 
     # For TDSA manifests, need to also add the measure as an item
