@@ -1,6 +1,7 @@
 import logging
 from copy import copy
 from openpyxl import load_workbook
+from openpyxl.utils import get_column_letter
 from datetime import date
 import pandas as pd
 from pandas import DataFrame
@@ -194,4 +195,4 @@ class ExcelBuilder(object):
         Determine the cell range based on the dataset size
         :return: a cell range e.g "A1:C26"
         """
-        return 'A1' + ':' + chr(ord('@') + self.cols) + str(self.rows + 1)
+        return 'A1' + ':' + get_column_letter(self.cols) + str(self.rows + 1)
