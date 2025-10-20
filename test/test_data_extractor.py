@@ -558,6 +558,38 @@ def test_hyper_to_csv():
     df = pd.read_csv(output_file)
     assert round(df['Sales'].sum(), 4) == 2326534.3543
 
+def test_hyper_to_csv_without_copy_to_tmp():
+    dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
+    dataset.measures = []
+    metadata = metadata_from_json(os.path.join('test', 'metadata.json'))
+    # Copy the source data to avoid overwriting during other pytest runs
+    shutil.copyfile(
+        src=os.path.join('test', 'orders.hyper'),
+        dst=os.path.join('test', 'orders_copy.hyper')
+    )
+    configuration = Configuration(
+        file_path=os.path.join('test', 'orders_copy.hyper')
+    )
+    extractor = HyperFile(
+        dataset_specification=dataset,
+        metadata=metadata,
+        configuration=configuration
+    )
+    output_folder = os.path.join('output', 'test_hyper_to_csv')
+    os.makedirs(output_folder, exist_ok=True)
+    output_file = os.path.join(output_folder, 'orders_without_temp.csv')
+    extractor.save_data_as_csv(
+        file_path=output_file,
+        minimise=False,
+        compress_using_gzip=False,
+        do_not_modify_source=False
+    )
+    assert extractor.get_total() == 10194
+    assert extractor.get_total(measure='Sales') == 2326534.3542999607
+
+    df = pd.read_csv(output_file)
+    assert round(df['Sales'].sum(), 4) == 2326534.3543
+
 
 def test_partitioning_extractor_partition_sql_no_data_in_partition():
     # Skip this test if we don't have a connection string
