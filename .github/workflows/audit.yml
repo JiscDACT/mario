@@ -14,9 +14,13 @@ jobs:
       - uses: actions/checkout@v3
       - name: install
         run: |
-          python -m venv env/
-          source env/bin/activate
-          python -m pip install -r requirements.txt
+          python -m venv env
+          # Upgrade wheel & setuptools first
+          env/bin/python -m pip install --upgrade wheel setuptools
+          # Install patched pip from GitHub commit to fix tarfile vulnerability
+          env/bin/python -m pip install "git+https://github.com/pypa/pip@f2b9231"
+          # Install project dependencies
+          env/bin/python -m pip install -r requirements.txt
       - uses: pypa/gh-action-pip-audit@v1.0.7
         with:
           virtual-environment: env/
