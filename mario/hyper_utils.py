@@ -294,11 +294,16 @@ def save_hyper_as_csv(hyper_file: str, file_path: str, **kwargs):
     options = CsvOptions(**kwargs)
 
     with tempfile.TemporaryDirectory() as temp_dir:
-        temp_hyper = os.path.join(temp_dir, 'temp.hyper')
-        shutil.copyfile(
-            src=hyper_file,
-            dst=temp_hyper
-        )
+        if options.do_not_modify_source:
+            logging.info('Copy the source hyper file into the temp directory.')
+            temp_hyper = os.path.join(temp_dir, 'temp.hyper')
+            shutil.copyfile(
+                src=hyper_file,
+                dst=temp_hyper
+            )
+        else:
+            logging.info('Use the source hyper file directly without creating a temp copy.')
+            temp_hyper = hyper_file
 
         schema, table = get_default_table_and_schema(temp_hyper)
 
