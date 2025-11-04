@@ -28,6 +28,7 @@ class CsvOptions(OutputOptions):
         super().__init__(**kwargs)
         self.compress_using_gzip = kwargs.get('compress_using_gzip', False)
         self.do_not_modify_source = kwargs.get('do_not_modify_source', True)
+        self.use_pantab = kwargs.get('use_pantab', True)
 
 
 class HyperOptions(OutputOptions):

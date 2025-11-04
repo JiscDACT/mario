@@ -290,6 +290,9 @@ def save_hyper_as_csv(hyper_file: str, file_path: str, **kwargs):
     import tempfile
     import shutil
     import os
+    import csv
+    import gzip
+    from tableauhyperapi import HyperProcess, Telemetry, Connection
 
     options = CsvOptions(**kwargs)
 
@@ -319,7 +322,7 @@ def save_hyper_as_csv(hyper_file: str, file_path: str, **kwargs):
                 input_hyper_file_path=temp_hyper,
                 schema=schema,
                 table=table
-            )
+                )
         else:
             log.debug("Data source already contains row numbers")
 
@@ -331,29 +334,62 @@ def save_hyper_as_csv(hyper_file: str, file_path: str, **kwargs):
         if options.compress_using_gzip:
             compression_options = dict(method='gzip')
             file_path = file_path + '.gz'
+            open_func = gzip.open
+            mode = "wt"
         elif file_path.endswith('.gz'):
             compression_options = dict(method='gzip')
+            open_func = gzip.open
+            mode = "wt"
         else:
             compression_options = None
+            open_func = open
+            mode = "w"
 
-        mode = 'w'
-        header = True
-        offset = 0
+        # Get column names
         column_names = ','.join(f'"{column}"' for column in columns)
-
         sql = f"SELECT {column_names} FROM \"{schema}\".\"{table}\" ORDER BY row_number"
+        offset = 0
 
-        while True:
-            query = f"{sql} LIMIT {options.chunk_size} OFFSET {offset}"
-            df_chunk = pantab.frame_from_hyper_query(temp_hyper, query)
-            if df_chunk.empty:
-                break
-            df_chunk.to_csv(file_path, index=False, mode=mode, header=header,
-                            compression=compression_options)
-            offset += options.chunk_size
-            if header:
-                header = False
-                mode = "a"
+        if options.use_pantab:
+            # Use pantab to stream hyper to csv
+            mode = 'w'
+            header = True
+
+            while True:
+                query = f"{sql} LIMIT {options.chunk_size} OFFSET {offset}"
+                df_chunk = pantab.frame_from_hyper_query(temp_hyper, query)
+                if df_chunk.empty:
+                    break
+                df_chunk.to_csv(file_path, index=False, mode=mode, header=header,
+                                compression=compression_options)
+                offset += options.chunk_size
+                if header:
+                    header = False
+                    mode = "a"
+        else:
+            # Use tableau hyper api to stream data to csv
+            with HyperProcess(telemetry=Telemetry.DO_NOT_SEND_USAGE_DATA_TO_TABLEAU) as hyper:
+                with Connection(endpoint=hyper.endpoint, database=temp_hyper) as connection:
+                    # Use an iterator cursor for streaming
+                    result = connection.execute_query(sql)
+
+                    with open_func(file_path, mode, newline='', encoding="utf-8") as f:
+                        writer = csv.writer(f)
+                        # write header
+                        writer.writerow(columns)
+
+                        buffer = []
+                        for row in result:
+                            buffer.append(row)
+                            if len(buffer) >= options.chunk_size:
+                                writer.writerows(buffer)
+                                buffer.clear()
+                                offset += options.chunk_size
+
+                        # write remaining
+                        if buffer:
+                            writer.writerows(buffer)
+                            offset += len(buffer)
 
 
 def save_dataframe_as_hyper(df, file_path, **kwargs):
