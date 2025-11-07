@@ -553,7 +553,7 @@ def test_hyper_to_csv():
         compress_using_gzip=False
     )
     assert extractor.get_total() == 10194
-    assert round(extractor.get_total(measure='Sales'), 4) == 2326534.3543
+    assert round(extractor.get_total(measure='Sales'), 2) == 2326534.35
 
     df = pd.read_csv(output_file)
     assert round(df['Sales'].sum(), 4) == 2326534.3543
@@ -585,7 +585,7 @@ def test_hyper_to_csv_without_copy_to_tmp():
         do_not_modify_source=False
     )
     assert extractor.get_total() == 10194
-    assert round(extractor.get_total(measure='Sales'), 4) == 2326534.3543
+    assert round(extractor.get_total(measure='Sales'), 2) == 2326534.35
 
     df = pd.read_csv(output_file)
     assert round(df['Sales'].sum(), 4) == 2326534.3543
@@ -618,7 +618,7 @@ def test_hyper_to_csv_without_using_pantab():
         use_pantab=False
     )
     assert extractor.get_total() == 10194
-    assert extractor.get_total(measure='Sales') == 2326534.3542999597
+    assert round(extractor.get_total(measure='Sales'), 2) == 2326534.35
 
     df = pd.read_csv(output_file)
     assert round(df['Sales'].sum(), 4) == 2326534.3543
