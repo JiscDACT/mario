@@ -347,8 +347,6 @@ def save_hyper_as_csv(hyper_file: str, file_path: str, **kwargs):
 
         # Get column names
         column_names = ','.join(f'"{column}"' for column in columns)
-        sql = f"SELECT {column_names} FROM \"{schema}\".\"{table}\" ORDER BY row_number"
-        offset = 0
 
         if options.use_pantab:
             # Use pantab to stream hyper to csv
@@ -356,6 +354,8 @@ def save_hyper_as_csv(hyper_file: str, file_path: str, **kwargs):
 
             mode = 'w'
             header = True
+            sql = f"SELECT {column_names} FROM \"{schema}\".\"{table}\" ORDER BY row_number"
+            offset = 0
 
             while True:
                 query = f"{sql} LIMIT {options.chunk_size} OFFSET {offset}"
@@ -375,22 +375,30 @@ def save_hyper_as_csv(hyper_file: str, file_path: str, **kwargs):
             with HyperProcess(Telemetry.DO_NOT_SEND_USAGE_DATA_TO_TABLEAU, 'test') as hyper:
                 with Connection(endpoint=hyper.endpoint, database=temp_hyper) as connection:
 
+                    # Get min and max value from row_number
+                    sql_range = f"SELECT MIN(row_number), MAX(row_number) FROM \"{schema}\".\"{table}\""
+                    value_range = connection.execute_query(sql_range)
+                    start_val, end_val = list(value_range)[0]
+                    logging.info(f"Get row_number range: [{str(start_val)}, {str(end_val)}]")
+
+                    sql = f"SELECT {column_names} FROM \"{schema}\".\"{table}\""
+
                     with open_func(file_path, mode, newline='', encoding="utf-8") as f:
 
                         writer = csv.writer(f)
                         # write header
                         writer.writerow(columns)
 
-                        while True:
-                            query = f"{sql} LIMIT {options.chunk_size} OFFSET {offset}"
+                        while start_val <= end_val:
+                            chunk_end = min(start_val+options.chunk_size-1, end_val)
+                            query = f"{sql} WHERE row_number BETWEEN {start_val} AND {chunk_end}"
+                            logging.info(f"Query between {start_val} and {chunk_end}")
+
                             result = connection.execute_query(query)
 
                             rows = list(result)
-                            if not rows:
-                                break
-
                             writer.writerows(rows)
-                            offset += options.chunk_size
+                            start_val += options.chunk_size
 
 
 def save_dataframe_as_hyper(df, file_path, **kwargs):
