@@ -1,0 +1,56 @@
+from mario.athena import AthenaConfiguration, AthenaStreamingDataExtractor
+from mario.dataset_specification import DatasetSpecification
+from mario.query_builder import SubsetQueryBuilder, ViewBasedQueryBuilder
+from mario.metadata import Metadata, Item
+import os
+
+
+def test_athena_stream():
+    os.makedirs('output/test_athena', exist_ok=True)
+
+    dataset = DatasetSpecification()
+    dataset.dimensions = [
+        "Academic Year",
+        "Mode of study",
+        "Country of HE provider"
+    ]
+    dataset.measures = ['Number']
+    dataset.name = 'student_open_data'
+    metadata = Metadata()
+    academic_year = Item()
+    academic_year.name = 'Academic Year'
+    mode_of_study = Item()
+    mode_of_study.name = 'Mode of study'
+    country_of_he_provider = Item()
+    country_of_he_provider.name = 'Country of HE provider'
+    number_field = Item()
+    number_field.name = 'Number'
+    metadata.add_item(academic_year)
+    metadata.add_item(mode_of_study)
+    metadata.add_item(number_field)
+    metadata.add_item(country_of_he_provider)
+
+    cfg = AthenaConfiguration()
+    cfg.query_builder = SubsetQueryBuilder
+    cfg.schema = 'demo'
+    cfg.view = 'student_open_data'
+
+    extractor = AthenaStreamingDataExtractor(
+        configuration=cfg,
+        metadata=metadata,
+        dataset_specification=dataset
+    )
+
+    extractor.stream_sql_to_csv(
+        file_path='output/test_athena/test.csv',
+        minimise=True,
+        compress_using_gzip=False,
+        do_not_modify_source=True
+    )
+
+    extractor.stream_sql_to_hyper(
+        file_path='output/test_athena/test.hyper',
+        minimise=True,
+        compress_using_gzip=False,
+        do_not_modify_source=True
+    )
