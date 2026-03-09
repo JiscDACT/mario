@@ -7,6 +7,7 @@ from pandas import DataFrame
 from mario.dataset_specification import DatasetSpecification
 from mario.metadata import Metadata
 from mario.options import CsvOptions, HyperOptions
+from mario.mapping import FieldMapping
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +29,8 @@ class Configuration:
                  schema: str = None,
                  file_path: str = None,
                  query_builder=None,
-                 user: str = None
+                 user: str = None,
+                 query_format=None
                  ):
         self.connection_string = connection_string
         self.hook = hook
@@ -37,6 +39,7 @@ class Configuration:
         self.file_path = file_path
         self.query_builder = query_builder
         self.user = user
+        self.query_format = query_format
 
 
 class DataExtractor:
@@ -51,6 +54,10 @@ class DataExtractor:
         self._data = None
         self._query = None
         self._total = 0
+        self.mapping = FieldMapping(
+            query_format=configuration.query_format,
+            items=dataset_specification.items
+        )
 
     def __load__(self):
         if self.configuration is not None:
@@ -113,7 +120,7 @@ class DataExtractor:
         elif meta.get_property('physical_column_name') is not None:
             return meta.get_property('physical_column_name')
         else:
-            return meta.name
+            return self.mapping.as_physical[meta.name]
 
     def __minimise_data__(self):
         """ Minimise data so we only keep the columns in the spec """

@@ -7,6 +7,7 @@ from pypika import Table, Criterion, PostgreSQLQuery as Query, functions as fn, 
 from mario.data_extractor import Configuration
 from mario.dataset_specification import DatasetSpecification
 from mario.metadata import Metadata
+from mario.mapping import FieldMapping
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +32,7 @@ class QueryBuilder:
         self.configuration = configuration
         self.metadata = metadata
         self.dataset_specification = dataset_specification
+        self.mapping = FieldMapping(query_format=configuration.query_format, items=dataset_specification.items)
 
     def create_query(self) -> [str, List[any]]:
         raise NotImplementedError
@@ -57,7 +59,7 @@ class ViewBasedQueryBuilder(QueryBuilder):
         if measure is None:
             _sql = f'SELECT COUNT(*) FROM "' + self.configuration.schema + '"."' + self.configuration.view + '"'
         else:
-            _sql = f'SELECT SUM("'+measure+'") FROM "' + self.configuration.schema + '"."' + self.configuration.view + '"'
+            _sql = f'SELECT SUM("'+self.mapping.as_physical[measure]+'") FROM "' + self.configuration.schema + '"."' + self.configuration.view + '"'
 
         _params = []
         return [_sql, _params]
@@ -127,12 +129,13 @@ class SubsetQueryBuilder(QueryBuilder):
             # Don't include calculated fields
             meta = self.metadata.get_metadata(field)
             if not meta.get_property('formula'):
-                select_fields.append(field)
+                select_fields.append(self.mapping.as_physical[field])
         group_fields = select_fields.copy()
 
         # remove measures from regular select
         measures = []
-        for measure in self.dataset_specification.measures:
+        for measure_field in self.dataset_specification.measures:
+            measure = self.mapping.as_physical[measure_field]
             if measure in select_fields:
                 select_fields.remove(measure)
                 group_fields.remove(measure)
