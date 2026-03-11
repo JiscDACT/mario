@@ -1,8 +1,9 @@
 from mario.athena import AthenaConfiguration, AthenaStreamingDataExtractor
 from mario.dataset_specification import DatasetSpecification
-from mario.query_builder import SubsetQueryBuilder, ViewBasedQueryBuilder
+from mario.query_builder import SubsetQueryBuilder
 from mario.metadata import Metadata, Item
 import os
+import pandas as pd
 
 
 def test_athena_stream():
@@ -47,6 +48,13 @@ def test_athena_stream():
         compress_using_gzip=False,
         do_not_modify_source=True
     )
+
+    # Load and test
+    df = pd.read_csv('output/test_athena/test.csv')
+    for column in dataset.dimensions:
+        assert column in df.columns
+    assert 'Number' in df.columns
+    assert len(df.columns) == len(dataset.items)
 
     extractor.stream_sql_to_hyper(
         file_path='output/test_athena/test.hyper',
