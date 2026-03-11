@@ -1,5 +1,7 @@
 from typing import List
 
+import pandas as pd
+
 from mario.utils import to_snake_case
 
 
@@ -23,3 +25,11 @@ class FieldMapping:
             return item
         if self._format == 'snake_case':
             return to_snake_case(item)
+
+    def df_to_logical(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Renames the columns in the dataframe from their physical to their logical names
+        :param df: pandas Dataframe
+        :return: pandas Dataframe
+        """
+        return df.rename(columns=self.as_logical)

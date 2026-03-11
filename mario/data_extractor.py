@@ -83,7 +83,9 @@ class DataExtractor:
         logger.info("Executing query")
         from sqlalchemy import create_engine
         engine = create_engine(self.configuration.connection_string)
-        self._data = pd.read_sql(sql=self._query[0], con=engine.connect(), params=self._query[1])
+        df = pd.read_sql(sql=self._query[0], con=engine.connect(), params=self._query[1])
+        df = self.mapping.df_to_logical(df)
+        self._data = df
 
     def __build_query__(self):
         logger.info("Building query")
@@ -112,22 +114,12 @@ class DataExtractor:
             table=table
         )
 
-    def __get_column_name__(self, item: str):
-        """ Returns the column name for a metadata item"""
-        meta = self.metadata.get_metadata(item)
-        if meta.get_property('output_name') is not None:
-            return meta.get_property('output_name')
-        elif meta.get_property('physical_column_name') is not None:
-            return meta.get_property('physical_column_name')
-        else:
-            return self.mapping.as_physical[meta.name]
-
     def __minimise_data__(self):
         """ Minimise data so we only keep the columns in the spec """
         columns_to_keep = []
         for item in self.dataset_specification.items:
             if self.metadata.get_metadata(item) and not self.metadata.get_metadata(item).get_property('formula'):
-                columns_to_keep.append(self.__get_column_name__(item))
+                columns_to_keep.append(item)
         self._data = self._data[columns_to_keep]
 
     def __get_measure__(self, measure=None):
@@ -403,6 +395,7 @@ class StreamingDataExtractor(DataExtractor):
         table_name = TableName(options.schema, options.table)
         row_counter = 0
         for df in pd.read_sql(self._query[0], connection, chunksize=options.chunk_size):
+            df = self.mapping.df_to_logical(df)
             if options.validate or options.minimise or options.include_row_numbers:
                 self._data = df
                 if options.validate:
@@ -429,6 +422,7 @@ class StreamingDataExtractor(DataExtractor):
         header = True
 
         for df in pd.read_sql(get_formatted_query(query[0], query[1]), connection, chunksize=options.chunk_size):
+            df = self.mapping.df_to_logical(df)
             if options.validate or options.minimise:
                 self._data = df
                 if options.validate:
