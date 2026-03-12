@@ -12,8 +12,8 @@ class AthenaConfiguration(Configuration):
 
     def __init__(self):
         super().__init__()
-        self.aws_s3_staging_dir = 's3://celeste-iceberg/athena-results/'
-        self.aws_region_name = 'eu-west-2'
+        self.aws_s3_staging_dir = None
+        self.aws_region_name = None
         self.aws_athena_workgroup = 'primary'
         self.catalog = 'awsdatacatalog'
         self.query_format = 'snake_case'

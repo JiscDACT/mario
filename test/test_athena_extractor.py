@@ -1,3 +1,5 @@
+import pytest
+
 from mario.athena import AthenaConfiguration, AthenaStreamingDataExtractor
 from mario.dataset_specification import DatasetSpecification
 from mario.query_builder import SubsetQueryBuilder
@@ -29,15 +31,23 @@ def get_test_conf():
     metadata.add_item(mode_of_study)
     metadata.add_item(number_field)
     metadata.add_item(country_of_he_provider)
-    return dataset, metadata
+
+    config = AthenaConfiguration()
+    config.aws_s3_staging_dir = 's3://celeste-iceberg/athena-results/'
+    config.aws_region_name = 'eu-west-2'
+
+    return dataset, metadata, config
 
 
-def test_athena_stream():
+def test_athena_stream_sql_to_csv():
+    # Skip this test if we don't have an AWS profile
+    if not os.environ.get('AWS_PROFILE'):
+        pytest.skip("Skipping Athena test as no AWS profile configured")
+
     shutil.rmtree('output/test_athena', ignore_errors=True)
     os.makedirs('output/test_athena', exist_ok=True)
 
-    dataset, metadata = get_test_conf()
-    cfg = AthenaConfiguration()
+    dataset, metadata, cfg = get_test_conf()
     cfg.query_builder = SubsetQueryBuilder
     cfg.schema = 'demo'
     cfg.view = 'student_open_data'
@@ -62,18 +72,14 @@ def test_athena_stream():
     assert 'Number' in df.columns
     assert len(df.columns) == len(dataset.items)
 
-    extractor.stream_sql_to_hyper(
-        file_path='output/test_athena/test.hyper',
-        minimise=True,
-        compress_using_gzip=False,
-        do_not_modify_source=True
-    )
-
 
 def test_athena_count():
+    # Skip this test if we don't have an AWS profile
+    if not os.environ.get('AWS_PROFILE'):
+        pytest.skip("Skipping Athena test as no AWS profile configured")
 
-    dataset, metadata = get_test_conf()
-    cfg = AthenaConfiguration()
+
+    dataset, metadata, cfg = get_test_conf()
     cfg.query_builder = SubsetQueryBuilder
     cfg.schema = 'demo'
     cfg.view = 'student_open_data'
@@ -87,3 +93,36 @@ def test_athena_count():
     total = extractor.get_total(measure=dataset.measures[0])
     print("total", total)  # 28,733,910
 
+
+def test_athena_save_data_as_csv():
+    # Skip this test if we don't have an AWS profile
+    if not os.environ.get('AWS_PROFILE'):
+        pytest.skip("Skipping Athena test as no AWS profile configured")
+
+    shutil.rmtree('output/test_athena', ignore_errors=True)
+    os.makedirs('output/test_athena', exist_ok=True)
+
+    dataset, metadata, cfg = get_test_conf()
+    cfg.query_builder = SubsetQueryBuilder
+    cfg.schema = 'demo'
+    cfg.view = 'student_open_data'
+
+    extractor = AthenaStreamingDataExtractor(
+        configuration=cfg,
+        metadata=metadata,
+        dataset_specification=dataset
+    )
+
+    extractor.save_data_as_csv(
+        file_path='output/test_athena/test.csv',
+        minimise=False,
+        compress_using_gzip=False,
+        do_not_modify_source=True
+    )
+
+    # Load and test
+    df = pd.read_csv('output/test_athena/test.csv')
+    for column in dataset.dimensions:
+        assert column in df.columns
+    assert 'Number' in df.columns
+    assert len(df.columns) == len(dataset.items)
