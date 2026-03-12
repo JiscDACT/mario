@@ -3,12 +3,11 @@ from mario.dataset_specification import DatasetSpecification
 from mario.query_builder import SubsetQueryBuilder
 from mario.metadata import Metadata, Item
 import os
+import shutil
 import pandas as pd
 
 
-def test_athena_stream():
-    os.makedirs('output/test_athena', exist_ok=True)
-
+def get_test_conf():
     dataset = DatasetSpecification()
     dataset.dimensions = [
         "Academic Year",
@@ -30,7 +29,14 @@ def test_athena_stream():
     metadata.add_item(mode_of_study)
     metadata.add_item(number_field)
     metadata.add_item(country_of_he_provider)
+    return dataset, metadata
 
+
+def test_athena_stream():
+    shutil.rmtree('output/test_athena', ignore_errors=True)
+    os.makedirs('output/test_athena', exist_ok=True)
+
+    dataset, metadata = get_test_conf()
     cfg = AthenaConfiguration()
     cfg.query_builder = SubsetQueryBuilder
     cfg.schema = 'demo'
@@ -62,3 +68,22 @@ def test_athena_stream():
         compress_using_gzip=False,
         do_not_modify_source=True
     )
+
+
+def test_athena_count():
+
+    dataset, metadata = get_test_conf()
+    cfg = AthenaConfiguration()
+    cfg.query_builder = SubsetQueryBuilder
+    cfg.schema = 'demo'
+    cfg.view = 'student_open_data'
+
+    extractor = AthenaStreamingDataExtractor(
+        configuration=cfg,
+        metadata=metadata,
+        dataset_specification=dataset
+    )
+
+    total = extractor.get_total(measure=dataset.measures[0])
+    print("total", total)  # 28,733,910
+
