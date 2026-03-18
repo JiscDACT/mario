@@ -3,6 +3,7 @@ from enum import Enum
 
 from mario.data_extractor import Configuration
 from mario.dataset_specification import DatasetSpecification
+from mario.mapping import FieldMapping
 from mario.metadata import Metadata, Item
 
 logger = logging.getLogger(__name__)
@@ -416,9 +417,23 @@ class SqlValidator(Validator):
                  configuration: Configuration
                  ):
         super().__init__(dataset_specification, metadata)
-        self.connection = self.__get_connection__(configuration.connection_string)
+        if configuration.hook:
+            # If the user provided a hook, delegate to it
+            self.connection = configuration.hook.get_conn()
+        else:
+            self.connection = self.__get_connection__(configuration.connection_string)
         self.schema = configuration.schema
         self.view = configuration.view
+        self.mapping = FieldMapping(query_format=configuration.query_format, items=dataset_specification.items)
+
+    def __get_column_name__(self, item: Item):
+        """ Returns the column name for a metadata item"""
+        if item.get_property('output_name') is not None:
+            return item.get_property('output_name')
+        elif item.get_property('physical_column_name') is not None:
+            return item.get_property('physical_column_name')
+        else:
+            return self.mapping.as_physical[item.name]
 
     def __get_connection__(self, connection_string: str):
         from sqlalchemy import create_engine
@@ -492,7 +507,7 @@ class SqlValidator(Validator):
         sql = f"SELECT COLUMN_NAME as col FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='{self.view}' AND TABLE_SCHEMA='{self.schema}'"
         df = pd.read_sql(sql, self.connection)
         values = df['col'].to_list()
-        if item.name not in values:
+        if self.__get_column_name__(item) not in values:
             self.errors.append(f"Validation error: '{item.name}' in specification is missing from dataset")
             return False
         return True
