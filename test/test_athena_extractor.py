@@ -1,3 +1,5 @@
+from copy import copy
+
 import pytest
 
 from mario.athena import AthenaConfiguration, AthenaStreamingDataExtractor
@@ -7,6 +9,19 @@ from mario.metadata import Metadata, Item
 import os
 import shutil
 import pandas as pd
+
+from mario.validation import SqlValidator
+
+AWS_ATHENA_RESULTS_DIR = os.environ.get('AWS_ATHENA_RESULTS_DIR')
+AWS_REGION = os.environ.get('AWS_REGION')
+
+
+class MockHook:
+    def __init__(self, extractor: AthenaStreamingDataExtractor):
+        self.extractor = extractor
+
+    def get_conn(self):
+        return self.extractor.get_connection()
 
 
 def get_test_conf():
@@ -23,8 +38,10 @@ def get_test_conf():
     academic_year.name = 'Academic Year'
     mode_of_study = Item()
     mode_of_study.name = 'Mode of study'
+    mode_of_study.set_property('domain', ['Full-time', 'Part-time'])
     country_of_he_provider = Item()
     country_of_he_provider.name = 'Country of HE provider'
+    country_of_he_provider.set_property('domain', ['England', 'Wales', 'Scotland', 'Northern Ireland'])
     number_field = Item()
     number_field.name = 'Number'
     metadata.add_item(academic_year)
@@ -33,8 +50,8 @@ def get_test_conf():
     metadata.add_item(country_of_he_provider)
 
     config = AthenaConfiguration()
-    config.aws_s3_staging_dir = 's3://celeste-iceberg/athena-results/'
-    config.aws_region_name = 'eu-west-2'
+    config.aws_s3_staging_dir = AWS_ATHENA_RESULTS_DIR
+    config.aws_region_name = AWS_REGION
 
     return dataset, metadata, config
 
@@ -126,3 +143,35 @@ def test_athena_save_data_as_csv():
         assert column in df.columns
     assert 'Number' in df.columns
     assert len(df.columns) == len(dataset.items)
+
+
+def test_athena_validate():
+    # Skip this test if we don't have an AWS profile
+    if not os.environ.get('AWS_PROFILE'):
+        pytest.skip("Skipping Athena test as no AWS profile configured")
+
+    shutil.rmtree('output/test_athena', ignore_errors=True)
+    os.makedirs('output/test_athena', exist_ok=True)
+
+    dataset, metadata, cfg = get_test_conf()
+    cfg.query_builder = SubsetQueryBuilder
+    cfg.schema = 'demo'
+    cfg.view = 'student_open_data'
+
+    extractor = AthenaStreamingDataExtractor(
+        configuration=cfg,
+        metadata=metadata,
+        dataset_specification=dataset
+    )
+    mock_hook = MockHook(extractor)
+    cfg_validator = copy(cfg)
+    cfg_validator.hook = mock_hook
+    validator = SqlValidator(
+        dataset_specification=dataset,
+        configuration=cfg_validator,
+        metadata=metadata
+    )
+    validator.validate_data(allow_nulls=False)
+
+
+
