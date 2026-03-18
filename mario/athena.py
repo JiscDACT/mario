@@ -37,6 +37,7 @@ class AthenaStreamingDataExtractor(StreamingDataExtractor):
 
         if cfg.hook:
             # If the user provided a hook, delegate to it
+            # See: https://airflow.apache.org/docs/apache-airflow-providers-amazon/stable/_api/airflow/providers/amazon/aws/hooks/athena_sql/index.html
             return cfg.hook.get_conn()
 
         # Expect these in configuration:
