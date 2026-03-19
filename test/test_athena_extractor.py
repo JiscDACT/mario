@@ -12,6 +12,7 @@ import pandas as pd
 
 from mario.validation import SqlValidator
 
+AWS_PROFILE = os.environ.get('AWS_PROFILE')
 AWS_ATHENA_RESULTS_DIR = os.environ.get('AWS_ATHENA_RESULTS_DIR')
 AWS_REGION = os.environ.get('AWS_REGION')
 
@@ -57,9 +58,9 @@ def get_test_conf():
 
 
 def test_athena_stream_sql_to_csv():
-    # Skip this test if we don't have an AWS profile
-    if not os.environ.get('AWS_PROFILE'):
-        pytest.skip("Skipping Athena test as no AWS profile configured")
+    # Skip this test if we don't have AWS env vars
+    if not AWS_PROFILE or not AWS_ATHENA_RESULTS_DIR or not AWS_REGION:
+        pytest.skip("Skipping Athena test as AWS not configured")
 
     shutil.rmtree('output/test_athena', ignore_errors=True)
     os.makedirs('output/test_athena', exist_ok=True)
@@ -91,10 +92,8 @@ def test_athena_stream_sql_to_csv():
 
 
 def test_athena_count():
-    # Skip this test if we don't have an AWS profile
-    if not os.environ.get('AWS_PROFILE'):
-        pytest.skip("Skipping Athena test as no AWS profile configured")
-
+    if not AWS_PROFILE or not AWS_ATHENA_RESULTS_DIR or not AWS_REGION:
+        pytest.skip("Skipping Athena test as AWS not configured")
 
     dataset, metadata, cfg = get_test_conf()
     cfg.query_builder = SubsetQueryBuilder
@@ -112,9 +111,8 @@ def test_athena_count():
 
 
 def test_athena_save_data_as_csv():
-    # Skip this test if we don't have an AWS profile
-    if not os.environ.get('AWS_PROFILE'):
-        pytest.skip("Skipping Athena test as no AWS profile configured")
+    if not AWS_PROFILE or not AWS_ATHENA_RESULTS_DIR or not AWS_REGION:
+        pytest.skip("Skipping Athena test as AWS not configured")
 
     shutil.rmtree('output/test_athena', ignore_errors=True)
     os.makedirs('output/test_athena', exist_ok=True)
@@ -146,9 +144,8 @@ def test_athena_save_data_as_csv():
 
 
 def test_athena_validate():
-    # Skip this test if we don't have an AWS profile
-    if not os.environ.get('AWS_PROFILE'):
-        pytest.skip("Skipping Athena test as no AWS profile configured")
+    if not AWS_PROFILE or not AWS_ATHENA_RESULTS_DIR or not AWS_REGION:
+        pytest.skip("Skipping Athena test as AWS not configured")
 
     shutil.rmtree('output/test_athena', ignore_errors=True)
     os.makedirs('output/test_athena', exist_ok=True)
