@@ -19,3 +19,13 @@ def to_snake_case(name: str) -> str:
     name = re.sub(r"[^\w]+", "_", name)
     name = re.sub(r"__+", "_", name).strip("_")
     return name
+
+
+def gzip_file(input_path, output_path=None):
+    import gzip
+    import shutil
+    if output_path is None:
+        output_path = input_path + ".gz"
+    with open(input_path, "rb") as f_in, gzip.open(output_path, "wb") as f_out:
+        shutil.copyfileobj(f_in, f_out)
+    return output_path

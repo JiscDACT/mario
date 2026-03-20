@@ -2,7 +2,7 @@ from copy import copy
 
 import pytest
 
-from mario.athena import AthenaConfiguration, AthenaStreamingDataExtractor
+from mario.athena import AthenaConfiguration, AthenaDataExtractor
 from mario.dataset_specification import DatasetSpecification
 from mario.query_builder import SubsetQueryBuilder
 from mario.metadata import Metadata, Item
@@ -18,7 +18,7 @@ AWS_REGION = os.environ.get('AWS_REGION')
 
 
 class MockHook:
-    def __init__(self, extractor: AthenaStreamingDataExtractor):
+    def __init__(self, extractor: AthenaDataExtractor):
         self.extractor = extractor
 
     def get_conn(self):
@@ -57,38 +57,39 @@ def get_test_conf():
     return dataset, metadata, config
 
 
-def test_athena_stream_sql_to_csv():
-    # Skip this test if we don't have AWS env vars
-    if not AWS_PROFILE or not AWS_ATHENA_RESULTS_DIR or not AWS_REGION:
-        pytest.skip("Skipping Athena test as AWS not configured")
-
-    shutil.rmtree('output/test_athena', ignore_errors=True)
-    os.makedirs('output/test_athena', exist_ok=True)
-
-    dataset, metadata, cfg = get_test_conf()
-    cfg.query_builder = SubsetQueryBuilder
-    cfg.schema = 'demo'
-    cfg.view = 'student_open_data'
-
-    extractor = AthenaStreamingDataExtractor(
-        configuration=cfg,
-        metadata=metadata,
-        dataset_specification=dataset
-    )
-
-    extractor.stream_sql_to_csv(
-        file_path='output/test_athena/test.csv',
-        minimise=True,
-        compress_using_gzip=False,
-        do_not_modify_source=True
-    )
-
-    # Load and test
-    df = pd.read_csv('output/test_athena/test.csv')
-    for column in dataset.dimensions:
-        assert column in df.columns
-    assert 'Number' in df.columns
-    assert len(df.columns) == len(dataset.items)
+# def test_athena_stream_sql_to_csv():
+#     # Skip this test if we don't have AWS env vars
+#     if not AWS_PROFILE or not AWS_ATHENA_RESULTS_DIR or not AWS_REGION:
+#         pytest.skip("Skipping Athena test as AWS not configured")
+#
+#     shutil.rmtree('output/test_athena', ignore_errors=True)
+#     os.makedirs('output/test_athena', exist_ok=True)
+#
+#     dataset, metadata, cfg = get_test_conf()
+#     cfg.query_builder = SubsetQueryBuilder
+#     cfg.schema = 'demo'
+#     cfg.view = 'student_open_data'
+#
+#     extractor = AthenaDataExtractor(
+#         configuration=cfg,
+#         metadata=metadata,
+#         dataset_specification=dataset
+#     )
+#
+#     extractor.stream_sql_to_csv(
+#         file_path='output/test_athena/test.csv',
+#         minimise=True,
+#         compress_using_gzip=False,
+#         do_not_modify_source=True
+#     )
+#
+#     # Load and test
+#     df = pd.read_csv('output/test_athena/test.csv')
+#     for column in dataset.dimensions:
+#         assert column in df.columns
+#     assert 'Number' in df.columns
+#     assert len(df.columns) == len(dataset.items)
+#     assert df['Number'].sum() == 28_733_910
 
 
 def test_athena_count():
@@ -100,14 +101,14 @@ def test_athena_count():
     cfg.schema = 'demo'
     cfg.view = 'student_open_data'
 
-    extractor = AthenaStreamingDataExtractor(
+    extractor = AthenaDataExtractor(
         configuration=cfg,
         metadata=metadata,
         dataset_specification=dataset
     )
 
     total = extractor.get_total(measure=dataset.measures[0])
-    print("total", total)  # 28,733,910
+    assert total == 28_733_910
 
 
 def test_athena_save_data_as_csv():
@@ -122,7 +123,7 @@ def test_athena_save_data_as_csv():
     cfg.schema = 'demo'
     cfg.view = 'student_open_data'
 
-    extractor = AthenaStreamingDataExtractor(
+    extractor = AthenaDataExtractor(
         configuration=cfg,
         metadata=metadata,
         dataset_specification=dataset
@@ -140,6 +141,8 @@ def test_athena_save_data_as_csv():
     for column in dataset.dimensions:
         assert column in df.columns
     assert 'Number' in df.columns
+    for dimension in dataset.dimensions:
+        assert dimension in df.columns
     assert len(df.columns) == len(dataset.items)
 
 
@@ -155,7 +158,7 @@ def test_athena_validate():
     cfg.schema = 'demo'
     cfg.view = 'student_open_data'
 
-    extractor = AthenaStreamingDataExtractor(
+    extractor = AthenaDataExtractor(
         configuration=cfg,
         metadata=metadata,
         dataset_specification=dataset
@@ -171,4 +174,37 @@ def test_athena_validate():
     validator.validate_data(allow_nulls=False)
 
 
+def test_athena_save_data_as_csv_with_gzip():
+    if not AWS_PROFILE or not AWS_ATHENA_RESULTS_DIR or not AWS_REGION:
+        pytest.skip("Skipping Athena test as AWS not configured")
+
+    shutil.rmtree('output/test_athena', ignore_errors=True)
+    os.makedirs('output/test_athena', exist_ok=True)
+
+    dataset, metadata, cfg = get_test_conf()
+    cfg.query_builder = SubsetQueryBuilder
+    cfg.schema = 'demo'
+    cfg.view = 'student_open_data'
+
+    extractor = AthenaDataExtractor(
+        configuration=cfg,
+        metadata=metadata,
+        dataset_specification=dataset
+    )
+
+    extractor.save_data_as_csv(
+        file_path='output/test_athena/test.csv',
+        minimise=False,
+        compress_using_gzip=True,
+        do_not_modify_source=True
+    )
+
+    # Load and test
+    df = pd.read_csv('output/test_athena/test.csv.gz')
+    for column in dataset.dimensions:
+        assert column in df.columns
+    assert 'Number' in df.columns
+    for dimension in dataset.dimensions:
+        assert dimension in df.columns
+    assert len(df.columns) == len(dataset.items)
 

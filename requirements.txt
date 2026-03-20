@@ -6,3 +6,4 @@ pypika
 sqlalchemy
 openpyxl
 pyathena
+awswrangler

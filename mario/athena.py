@@ -1,6 +1,10 @@
 from pyathena import connect
-from mario.data_extractor import StreamingDataExtractor, Configuration
+from mario.data_extractor import DataExtractor, Configuration
 import logging
+
+from mario.mapping import rewrite_csv_header_with_fieldmapping
+from mario.options import CsvOptions
+from mario.utils import gzip_file
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +23,7 @@ class AthenaConfiguration(Configuration):
         self.query_format = 'snake_case'
 
 
-class AthenaStreamingDataExtractor(StreamingDataExtractor):
+class AthenaDataExtractor(DataExtractor):
     """
     Streaming extractor using Athena + PyAthena.
     Extends StreamingDataExtractor; only get_connection() is Athena-specific.
@@ -48,3 +52,72 @@ class AthenaStreamingDataExtractor(StreamingDataExtractor):
             schema_name=cfg.schema,
             catalog_name=cfg.catalog
     )
+
+    def get_total(self, measure=None):
+        """
+        For totals when streaming data we need to run a totals SQL query separate
+        from the main query and use the results of this
+        :return: the total value of the query
+        TODO this is a direct copy from StreamingDataExtractor
+        """
+        from pandas import read_sql
+        logger.info("Building totals query")
+        measure = self.__get_measure__(measure)
+        if self.configuration.query_builder is not None:
+            from mario.query_builder import QueryBuilder
+            query_builder: QueryBuilder = self.configuration.query_builder(
+                configuration=self.configuration,
+                metadata=self.metadata,
+                dataset_specification=self.dataset_specification)
+            totals_query = query_builder.create_totals_query(measure=measure)
+        else:
+            raise NotImplementedError
+
+        totals_df = read_sql(totals_query[0], self.get_connection(), params=totals_query[1])
+        return totals_df.iat[0, 0]
+
+    def save_data_as_csv(self, file_path: str, **kwargs):
+        """
+        Athena doesn't support streaming, but natively saves CSV files
+        in S3 as output so we really don't need to do anything else
+        other than run the query and download the results from S3
+        :param file_path:
+        :param kwargs:
+        :return:
+        """
+        import awswrangler as wr
+        import boto3
+
+        # Parse options
+        options = CsvOptions(**kwargs)
+
+        # Build SQL
+        self.__build_query__()
+        sql = self._query[0]
+        cfg = self.configuration
+
+        # 1. Run SQL via Wrangler
+        qid = wr.athena.start_query_execution(
+            sql=sql,
+            database=cfg.schema,
+            workgroup=cfg.aws_athena_workgroup,
+            s3_output=cfg.aws_s3_staging_dir,
+        )
+        wr.athena.wait_query(qid)
+
+        # 2. Get S3 CSV result path
+        client = boto3.client("athena")
+        meta = client.get_query_execution(QueryExecutionId=qid)
+        s3_uri = meta["QueryExecution"]["ResultConfiguration"]["OutputLocation"]
+
+        # 3. Download raw Athena CSV
+        wr.s3.download(path=s3_uri, local_file=file_path)
+
+        # 4. Rewrite header with FieldMapping
+        rewrite_csv_header_with_fieldmapping(file_path, self.mapping)
+
+        if options.compress_using_gzip:
+            gz_path = gzip_file(file_path)
+            return gz_path
+
+        return file_path
