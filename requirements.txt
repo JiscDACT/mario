@@ -7,3 +7,4 @@ sqlalchemy
 openpyxl
 pyathena
 awswrangler
+boto3

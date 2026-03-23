@@ -25,6 +25,6 @@ setup(
     extras_require={
         'Airflow': ['apache-airflow-providers-common-sql'],
         'Tableau': ['pantab', 'tableauhyperapi', 'tableau-builder==0.18'],
-        'Athena': ['pyathena', 'awswrangler']
+        'Athena': ['pyathena', 'awswrangler', 'boto3']
     }
 )
