@@ -35,7 +35,7 @@ class AthenaDataExtractor(DataExtractor):
 
     def get_connection(self):
         """
-        PyAthena provides a DBAPI connection compatible with pandas.read_sql() including chunksize.
+        PyAthena provides a DBAPI connection compatible with pandas.read_sql().
         """
         cfg = self.configuration
 
@@ -51,7 +51,7 @@ class AthenaDataExtractor(DataExtractor):
             work_group=cfg.aws_athena_workgroup,
             schema_name=cfg.schema,
             catalog_name=cfg.catalog
-    )
+        )
 
     def get_total(self, measure=None):
         """
@@ -76,20 +76,14 @@ class AthenaDataExtractor(DataExtractor):
         totals_df = read_sql(totals_query[0], self.get_connection(), params=totals_query[1])
         return totals_df.iat[0, 0]
 
-    def save_data_as_csv(self, file_path: str, **kwargs):
+    def run_query(self) -> str:
         """
-        Athena doesn't support streaming, but natively saves CSV files
-        in S3 as output so we really don't need to do anything else
-        other than run the query and download the results from S3
-        :param file_path:
-        :param kwargs:
-        :return:
+        Runs the SQL query in Athena and returns the
+        result path in S3
+        :return: the S3 path where the result is stored
         """
         import awswrangler as wr
         import boto3
-
-        # Parse options
-        options = CsvOptions(**kwargs)
 
         # Build SQL
         self.__build_query__()
@@ -110,10 +104,29 @@ class AthenaDataExtractor(DataExtractor):
         meta = client.get_query_execution(QueryExecutionId=qid)
         s3_uri = meta["QueryExecution"]["ResultConfiguration"]["OutputLocation"]
 
-        # 3. Download raw Athena CSV
+        return s3_uri
+
+    def save_data_as_csv(self, file_path: str, **kwargs):
+        """
+        Athena doesn't support streaming, but natively saves CSV files
+        in S3 as output, so we really don't need to do anything else
+        other than run the query and download the results from S3
+        :param file_path:
+        :param kwargs:
+        :return:
+        """
+        import awswrangler as wr
+
+        # Parse options
+        options = CsvOptions(**kwargs)
+
+        # Run query and get output location
+        s3_uri = self.run_query()
+
+        # Download raw Athena CSV
         wr.s3.download(path=s3_uri, local_file=file_path)
 
-        # 4. Rewrite header with FieldMapping
+        # Rewrite header with FieldMapping
         rewrite_csv_header_with_fieldmapping(file_path, self.mapping)
 
         if options.compress_using_gzip:
