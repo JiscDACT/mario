@@ -425,6 +425,7 @@ class SqlValidator(Validator):
         self.schema = configuration.schema
         self.view = configuration.view
         self.mapping = FieldMapping(query_format=configuration.query_format, items=dataset_specification.items)
+        self.cached_column_values = {}
 
     def __get_column_name__(self, item: Item):
         """ Returns the column name for a metadata item"""
@@ -484,9 +485,22 @@ class SqlValidator(Validator):
     def __get_column_values__(self, item: Item):
         import pandas as pd
         column = self.__get_column_name__(item)
+
+        # Get cached values if present
+        if column in self.cached_column_values:
+            return self.cached_column_values[column]
+
+        # If the column is not present, clear the cache - we don't want to
+        # cache all the columns as that uses more memory
+        self.cached_column_values = {}
+
+        # Load unique values
         sql = f"SELECT DISTINCT \"{column}\" AS checkfield FROM {self.schema}.{self.view}"
         df = pd.read_sql(sql, self.connection)
         values = df['checkfield'].to_list()
+
+        # Cache values so we don't repeat this query
+        self.cached_column_values[column] = values
         return values
 
     def __get_data_for_hierarchy__(self, name):
