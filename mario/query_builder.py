@@ -165,7 +165,7 @@ class SubsetQueryBuilder(QueryBuilder):
         clauses = []
         parameters = {}
         for constraint in self.dataset_specification.constraints:
-            column = constraint.item
+            column = self.mapping.as_physical[constraint.item]
             placeholders = []
             for i in range(len(constraint.allowed_values)):
                 parameter_name = column.replace(" ", "_") + str(i)
