@@ -252,7 +252,7 @@ class DatasetSplitter:
         # For each unique value, subset the data and create the output
         for value in values:
             logger.info(f"Splitting {file_name} for value {value}")
-            output_folder = os.path.join(self.output_path, value)
+            output_folder = os.path.join(self.output_path, str(value))
             os.makedirs(output_folder, exist_ok=True)
             output_path = os.path.join(output_folder, file_name)
             builder.filepath = output_path
