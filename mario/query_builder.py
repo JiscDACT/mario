@@ -32,7 +32,11 @@ class QueryBuilder:
         self.configuration = configuration
         self.metadata = metadata
         self.dataset_specification = dataset_specification
-        self.mapping = FieldMapping(query_format=configuration.query_format, items=dataset_specification.items)
+        items = dataset_specification.items
+        if dataset_specification.constraints:
+            for constraint in dataset_specification.constraints:
+                items.append(constraint.item)
+        self.mapping = FieldMapping(query_format=configuration.query_format, items=items)
 
     def create_query(self) -> [str, List[any]]:
         raise NotImplementedError
