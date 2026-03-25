@@ -3,7 +3,7 @@ from copy import copy
 import pytest
 
 from mario.athena import AthenaConfiguration, AthenaDataExtractor
-from mario.dataset_specification import DatasetSpecification
+from mario.dataset_specification import DatasetSpecification, Constraint
 from mario.query_builder import SubsetQueryBuilder
 from mario.metadata import Metadata, Item
 import os
@@ -55,41 +55,6 @@ def get_test_conf():
     config.aws_region_name = AWS_REGION
 
     return dataset, metadata, config
-
-
-# def test_athena_stream_sql_to_csv():
-#     # Skip this test if we don't have AWS env vars
-#     if not AWS_PROFILE or not AWS_ATHENA_RESULTS_DIR or not AWS_REGION:
-#         pytest.skip("Skipping Athena test as AWS not configured")
-#
-#     shutil.rmtree('output/test_athena', ignore_errors=True)
-#     os.makedirs('output/test_athena', exist_ok=True)
-#
-#     dataset, metadata, cfg = get_test_conf()
-#     cfg.query_builder = SubsetQueryBuilder
-#     cfg.schema = 'demo'
-#     cfg.view = 'student_open_data'
-#
-#     extractor = AthenaDataExtractor(
-#         configuration=cfg,
-#         metadata=metadata,
-#         dataset_specification=dataset
-#     )
-#
-#     extractor.stream_sql_to_csv(
-#         file_path='output/test_athena/test.csv',
-#         minimise=True,
-#         compress_using_gzip=False,
-#         do_not_modify_source=True
-#     )
-#
-#     # Load and test
-#     df = pd.read_csv('output/test_athena/test.csv')
-#     for column in dataset.dimensions:
-#         assert column in df.columns
-#     assert 'Number' in df.columns
-#     assert len(df.columns) == len(dataset.items)
-#     assert df['Number'].sum() == 28_733_910
 
 
 def test_athena_count():
@@ -208,3 +173,46 @@ def test_athena_save_data_as_csv_with_gzip():
         assert dimension in df.columns
     assert len(df.columns) == len(dataset.items)
 
+
+def test_athena_with_constraints():
+    if not AWS_PROFILE or not AWS_ATHENA_RESULTS_DIR or not AWS_REGION:
+        pytest.skip("Skipping Athena test as AWS not configured")
+
+    shutil.rmtree('output/test_athena_with_constraints', ignore_errors=True)
+    os.makedirs('output/test_athena_with_constraints', exist_ok=True)
+
+    dataset, metadata, cfg = get_test_conf()
+    level_of_study = Item()
+    level_of_study.name = 'Level of study'
+    level_constraint = Constraint()
+    level_constraint.item = level_of_study.name
+    level_constraint.allowed_values = ['Postgraduate (research)', 'Postgraduate (taught)']
+    metadata.add_item(level_of_study)
+    dataset.dimensions.append(level_of_study.name)
+    dataset.constraints.append(level_constraint)
+    cfg.query_builder = SubsetQueryBuilder
+    cfg.schema = 'demo'
+    cfg.view = 'student_open_data'
+
+    extractor = AthenaDataExtractor(
+        configuration=cfg,
+        metadata=metadata,
+        dataset_specification=dataset
+    )
+
+    extractor.save_data_as_csv(
+        file_path='output/test_athena_with_constraints/test.csv',
+        minimise=False,
+        compress_using_gzip=False,
+        do_not_modify_source=True
+    )
+
+    # Load and test
+    df = pd.read_csv('output/test_athena_with_constraints/test.csv')
+    for column in dataset.dimensions:
+        assert column in df.columns
+    assert 'Number' in df.columns
+    for dimension in dataset.dimensions:
+        assert dimension in df.columns
+    assert len(df.columns) == len(dataset.items)
+    print(df['Level of study'].unique())
