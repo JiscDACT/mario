@@ -1,6 +1,9 @@
 from pyathena import connect
 from mario.data_extractor import DataExtractor, Configuration
 import logging
+import datetime
+import numbers
+import re
 
 from mario.mapping import rewrite_csv_header_with_fieldmapping
 from mario.options import CsvOptions
@@ -58,7 +61,7 @@ class AthenaDataExtractor(DataExtractor):
         For totals when streaming data we need to run a totals SQL query separate
         from the main query and use the results of this
         :return: the total value of the query
-        TODO this is a direct copy from StreamingDataExtractor
+        NOTE this is a direct copy from StreamingDataExtractor
         """
         from pandas import read_sql
         logger.info("Building totals query")
@@ -87,7 +90,8 @@ class AthenaDataExtractor(DataExtractor):
 
         # Build SQL
         self.__build_query__()
-        sql = self._query[0]
+        raw_sql, parameters = self._query
+        sql = interpolate_athena_sql(raw_sql, parameters)
         cfg = self.configuration
 
         # 1. Run SQL via Wrangler
@@ -134,3 +138,56 @@ class AthenaDataExtractor(DataExtractor):
             return gz_path
 
         return file_path
+
+
+ATHENA_PARAM_PATTERN = re.compile(r'%\((?P<name>[a-zA-Z0-9_]+)\)s')
+
+
+def athena_escape_string(value: str) -> str:
+    """
+    Escape a Python string for safe Athena SQL literal usage.
+    Athena uses standard SQL single-quoted strings; internal quotes doubled.
+    """
+    return value.replace("'", "''")
+
+
+def athena_literal(value):
+    """
+    Convert a Python value into an Athena-safe SQL literal.
+    """
+    # None -> NULL
+    if value is None:
+        return "NULL"
+
+    # Boolean -> true/false
+    if isinstance(value, bool):
+        return "true" if value else "false"
+
+    # Number -> raw
+    if isinstance(value, numbers.Number):
+        return str(value)
+
+    # Date / datetime
+    if isinstance(value, (datetime.date, datetime.datetime)):
+        return f"'{value.isoformat()}'"
+
+    # List/tuple -> comma-separated list of literals
+    if isinstance(value, (list, tuple)):
+        return ", ".join(athena_literal(v) for v in value)
+
+    # Everything else -> string literal
+    return f"'{athena_escape_string(str(value))}'"
+
+
+def interpolate_athena_sql(sql: str, params: dict):
+    """
+    Replace all %(name)s placeholders using Athena-safe literals.
+    """
+
+    def repl(match):
+        name = match.group("name")
+        if name not in params:
+            raise KeyError(f"Missing SQL parameter: {name}")
+        return athena_literal(params[name])
+
+    return ATHENA_PARAM_PATTERN.sub(repl, sql)
