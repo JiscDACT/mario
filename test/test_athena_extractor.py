@@ -215,4 +215,49 @@ def test_athena_with_constraints():
     for dimension in dataset.dimensions:
         assert dimension in df.columns
     assert len(df.columns) == len(dataset.items)
-    print(df['Level of study'].unique())
+    assert len(df['Level of study'].unique()) == 2
+
+
+def test_athena_with_constraints_and_apostrophes():
+    if not AWS_PROFILE or not AWS_ATHENA_RESULTS_DIR or not AWS_REGION:
+        pytest.skip("Skipping Athena test as AWS not configured")
+
+    shutil.rmtree('output/test_athena_with_constraints_and_apostrophes', ignore_errors=True)
+    os.makedirs('output/test_athena_with_constraints_and_apostrophes', exist_ok=True)
+
+    dataset, metadata, cfg = get_test_conf()
+    provider = Item()
+    provider.name = 'HE Provider'
+    provider_constraint = Constraint()
+    provider_constraint.item = provider.name
+    provider_constraint.allowed_values = ["Queen's University Belfast", "City St George's, University of London"]
+    metadata.add_item(provider)
+    dataset.dimensions.append(provider.name)
+    dataset.constraints.append(provider_constraint)
+    cfg.query_builder = SubsetQueryBuilder
+    cfg.schema = 'demo'
+    cfg.view = 'student_open_data'
+
+    extractor = AthenaDataExtractor(
+        configuration=cfg,
+        metadata=metadata,
+        dataset_specification=dataset
+    )
+
+    extractor.save_data_as_csv(
+        file_path='output/test_athena_with_constraints_and_apostrophes/test.csv',
+        minimise=False,
+        compress_using_gzip=False,
+        do_not_modify_source=True
+    )
+
+    # Load and test
+    df = pd.read_csv('output/test_athena_with_constraints_and_apostrophes/test.csv')
+    for column in dataset.dimensions:
+        assert column in df.columns
+    assert 'Number' in df.columns
+    for dimension in dataset.dimensions:
+        assert dimension in df.columns
+    assert len(df.columns) == len(dataset.items)
+    assert len(df['HE Provider'].unique()) == 2
+    assert "Queen's University Belfast" in df['HE Provider'].unique()
