@@ -410,7 +410,6 @@ class StreamingDataExtractor(DataExtractor):
             frame_to_hyper(df, database=file_path, table=table_name, table_mode='a')
 
     def stream_sql_query_to_csv(self, file_path, query, connection, row_counter=0, **kwargs) -> int:
-        from mario.query_builder import get_formatted_query
         options = CsvOptions(**kwargs)
         if options.compress_using_gzip:
             compression_options = dict(method='gzip')
@@ -421,7 +420,7 @@ class StreamingDataExtractor(DataExtractor):
         mode = 'w'
         header = True
 
-        for df in pd.read_sql(get_formatted_query(query[0], query[1]), connection, chunksize=options.chunk_size):
+        for df in pd.read_sql(sql=query[0], params=query[1], con=connection, chunksize=options.chunk_size):
             if options.validate or options.minimise:
                 self._data = df
                 if options.validate:
@@ -645,7 +644,6 @@ class PartitioningExtractor(StreamingDataExtractor):
         logger.info("Executing query")
         from tableauhyperapi import TableName
         from pantab import frame_to_hyper
-        from mario.query_builder import get_formatted_query
 
         options = HyperOptions(**kwargs)
         connection = self.get_connection()
@@ -655,7 +653,7 @@ class PartitioningExtractor(StreamingDataExtractor):
 
         for partition_value in self.__get_partition_values__():
             query = self.__build_query_using_partition__(partition_value=partition_value)
-            for df in pd.read_sql(get_formatted_query(query[0], query[1]), connection, chunksize=options.chunk_size):
+            for df in pd.read_sql(sql=query[0], params=query[1], con=connection, chunksize=options.chunk_size):
                 if options.validate or options.minimise:
                     self._data = df
                     if options.validate:
