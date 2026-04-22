@@ -265,12 +265,14 @@ class DataFrameValidator(Validator):
         data_type = str(self.data[column].dtype).lower()
         if data_type in ['category', 'string']:
             return DataTypes.TEXT
-        if data_type in ['float64']:
+        if data_type in ['float64', 'double[pyarrow]']:
             return DataTypes.DOUBLE
         if data_type in ['int', 'int64']:
             return DataTypes.INT
         if data_type in ['datetime64', 'datetime64[ns]']:
             return DataTypes.DATETIME
+        if data_type in ['date32[day][pyarrow]']:
+            return DataTypes.DATE
         if data_type in ['object']:
             return DataTypes.OBJECT
         return data_type
