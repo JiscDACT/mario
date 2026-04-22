@@ -12,18 +12,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+
       - name: install
         run: |
           python -m venv env
-          # Upgrade wheel & setuptools first
-          env/bin/python -m pip install --upgrade wheel setuptools
-          # Install patched pip from GitHub commit to fix tarfile vulnerability
-          env/bin/python -m pip install "git+https://github.com/pypa/pip@f2b9231"
-          # Install project dependencies
+
+          # Activate venv pip upgrade FIRST
+          env/bin/python -m pip install --upgrade pip setuptools wheel
+
+          # Install dependencies
           env/bin/python -m pip install -r requirements.txt
       - uses: pypa/gh-action-pip-audit@v1.0.7
         with:
           virtual-environment: env/
           local: true
-          # These are issues with the audit checker itself!
-          ignore-vulns: PYSEC-2023-74 PYSEC-2022-43012 PYSEC-2023-228 PYSEC-2023-221 GHSA-9wx4-h78v-vm56 GHSA-9hjg-9r4m-mvj7 GHSA-pq67-6m6q-mj2v GHSA-gc5v-m9x4-r6x2 GHSA-gm62-xv2j-4w53 GHSA-2xpw-w6gg-jr37 GHSA-38jv-5279-wg99
