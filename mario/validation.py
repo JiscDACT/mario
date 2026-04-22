@@ -265,12 +265,14 @@ class DataFrameValidator(Validator):
         data_type = str(self.data[column].dtype).lower()
         if data_type in ['category', 'string']:
             return DataTypes.TEXT
-        if data_type in ['float64']:
+        if data_type in ['float64', 'double[pyarrow]']:
             return DataTypes.DOUBLE
         if data_type in ['int', 'int64']:
             return DataTypes.INT
         if data_type in ['datetime64', 'datetime64[ns]']:
             return DataTypes.DATETIME
+        if data_type in ['date32[day][pyarrow]']:
+            return DataTypes.DATE
         if data_type in ['object']:
             return DataTypes.OBJECT
         return data_type
@@ -324,32 +326,33 @@ class HyperValidator(Validator):
 
     def __get_data_for_hierarchy__(self, name):
         from pantab import frame_from_hyper_query
+
         fields = ', '.join(f'"{s}"' for s in self.metadata.get_hierarchy(name))
+
         query = f"""
-                     SELECT
-                         {fields} 
-                     FROM "{self.schema}"."{self.table}" 
-                     GROUP BY {fields} 
+            SELECT {fields}
+            FROM "{self.schema}"."{self.table}"
+            GROUP BY {fields}
         """
-        from tableauhyperapi import HyperProcess, Telemetry, Connection
-        with HyperProcess(Telemetry.DO_NOT_SEND_USAGE_DATA_TO_TABLEAU, 'test') as hyper:
-            with Connection(hyper.endpoint, self.hyper_file_path) as connection:
-                results_df = frame_from_hyper_query(connection,query)
+
+        results_df = frame_from_hyper_query(self.hyper_file_path, query)
         return results_df
 
-    def __get_column_with_segmentation__(self, item:Item, segmentation: str):
+    def __get_column_with_segmentation__(self, item: Item, segmentation: str):
         from pantab import frame_from_hyper_query
+
         column = self.__get_column_name__(item)
+
         query = f"""
-                    SELECT COUNT(DISTINCT "{column}")
-                    FROM "{self.schema}"."{self.table}" 
-                    GROUP BY "{segmentation}"
+            SELECT COUNT(DISTINCT "{column}")
+            FROM "{self.schema}"."{self.table}"
+            GROUP BY "{segmentation}"
         """
-        from tableauhyperapi import HyperProcess, Telemetry, Connection
-        with HyperProcess(Telemetry.DO_NOT_SEND_USAGE_DATA_TO_TABLEAU, 'test') as hyper:
-            with Connection(hyper.endpoint, self.hyper_file_path) as connection:
-                results_df = frame_from_hyper_query(connection,query)
+
+        results_df = frame_from_hyper_query(self.hyper_file_path, query)
         return results_df
+
+
 
     def check_column_present(self, item: Item):
         column = self.__get_column_name__(item)
