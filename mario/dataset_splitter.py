@@ -123,7 +123,7 @@ class DatasetSplitter:
             if value not in file_handles:
                 os.makedirs(os.path.join(self.output_path, value), exist_ok=True)
                 file_path = self.get_output_path(field_value=value, file=file_name)
-                file_handles[value] = open(file_path, 'w', newline='')
+                file_handles[value] = open(file_path, 'w', newline='', encoding='utf-8')
                 writer = csv.DictWriter(file_handles[value], fieldnames=row.keys())
                 writer.writeheader()
             writer = csv.DictWriter(file_handles[value], fieldnames=row.keys())
@@ -142,7 +142,7 @@ class DatasetSplitter:
 
         output_file_name = file_name.rstrip('.gz')
 
-        with gzip.open(file_path, 'rt', newline='') as infile:
+        with gzip.open(file_path, 'rt', newline='', encoding='utf-8') as infile:
             reader = csv.DictReader(infile)
 
             # Process the input file in batches
@@ -172,7 +172,7 @@ class DatasetSplitter:
         file_path = os.path.join(self.source_path, file_name)
 
         # Open the input CSV file for reading
-        with open(file_path, 'r') as infile:
+        with open(file_path, 'r', encoding='utf-8') as infile:
             reader = csv.DictReader(infile)
 
             # Process the input file in batches
