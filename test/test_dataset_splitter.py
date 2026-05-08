@@ -9,7 +9,7 @@ import csv
 
 
 def count_rows_in_csv(file_path):
-    with open(file_path, 'r') as file:
+    with open(file_path, 'r', encoding='utf-8') as file:
         reader = csv.reader(file)
         row_count = sum(1 for row in reader) - 1  # Subtract 1 to exclude the header row
     return row_count

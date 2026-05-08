@@ -7,6 +7,7 @@ from pandas import DataFrame
 from mario.dataset_specification import DatasetSpecification
 from mario.metadata import Metadata
 from mario.options import CsvOptions, HyperOptions
+from mario.mapping import FieldMapping
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +29,8 @@ class Configuration:
                  schema: str = None,
                  file_path: str = None,
                  query_builder=None,
-                 user: str = None
+                 user: str = None,
+                 query_format=None
                  ):
         self.connection_string = connection_string
         self.hook = hook
@@ -37,6 +39,7 @@ class Configuration:
         self.file_path = file_path
         self.query_builder = query_builder
         self.user = user
+        self.query_format = query_format
 
 
 class DataExtractor:
@@ -51,6 +54,10 @@ class DataExtractor:
         self._data = None
         self._query = None
         self._total = 0
+        self.mapping = FieldMapping(
+            query_format=configuration.query_format,
+            items=dataset_specification.items
+        )
 
     def __load__(self):
         if self.configuration is not None:
@@ -76,7 +83,9 @@ class DataExtractor:
         logger.info("Executing query")
         from sqlalchemy import create_engine
         engine = create_engine(self.configuration.connection_string)
-        self._data = pd.read_sql(sql=self._query[0], con=engine.connect(), params=self._query[1])
+        df = pd.read_sql(sql=self._query[0], con=engine.connect(), params=self._query[1])
+        df = self.mapping.df_to_logical(df)
+        self._data = df
 
     def __build_query__(self):
         logger.info("Building query")
@@ -105,22 +114,12 @@ class DataExtractor:
             table=table
         )
 
-    def __get_column_name__(self, item: str):
-        """ Returns the column name for a metadata item"""
-        meta = self.metadata.get_metadata(item)
-        if meta.get_property('output_name') is not None:
-            return meta.get_property('output_name')
-        elif meta.get_property('physical_column_name') is not None:
-            return meta.get_property('physical_column_name')
-        else:
-            return meta.name
-
     def __minimise_data__(self):
         """ Minimise data so we only keep the columns in the spec """
         columns_to_keep = []
         for item in self.dataset_specification.items:
             if self.metadata.get_metadata(item) and not self.metadata.get_metadata(item).get_property('formula'):
-                columns_to_keep.append(self.__get_column_name__(item))
+                columns_to_keep.append(item)
         self._data = self._data[columns_to_keep]
 
     def __get_measure__(self, measure=None):
@@ -171,7 +170,7 @@ class DataExtractor:
         if self._data is None:
             self.__load__()
         if 'row_number' in self._data.columns:
-            self._data = self._data .drop(columns=['row_number'])
+            self._data = self._data.drop(columns=['row_number'])
 
     def save_query(self, file_path: str, formatted: bool = False):
         """
@@ -229,6 +228,7 @@ class HyperFile(DataExtractor):
     Wrapper for a HyperFile as a data extractor - use when no data needs to be extracted,
     and we just want to treat a hyper as a hyper with no conversion to/from dataframe
     """
+
     def __init__(self,
                  configuration: Configuration,
                  dataset_specification: DatasetSpecification,
@@ -289,7 +289,7 @@ class HyperFile(DataExtractor):
             )
         save_hyper_as_hyper(hyper_file=self.configuration.file_path, file_path=file_path, **kwargs)
 
-    def save_data_as_csv(self,file_path: str, **kwargs):
+    def save_data_as_csv(self, file_path: str, **kwargs):
         from mario.hyper_utils import save_hyper_as_csv
         options = CsvOptions(**kwargs)
         if options.minimise:
@@ -309,6 +309,7 @@ class StreamingDataExtractor(DataExtractor):
     supporting streaming data from SQL to output formats without
     holding any data in memory using a data frame
     """
+
     def __init__(self,
                  configuration: Configuration,
                  dataset_specification: DatasetSpecification,
@@ -396,6 +397,7 @@ class StreamingDataExtractor(DataExtractor):
         table_name = TableName(options.schema, options.table)
         row_counter = 0
         for df in pd.read_sql(self._query[0], connection, chunksize=options.chunk_size):
+            df = self.mapping.df_to_logical(df)
             if options.validate or options.minimise or options.include_row_numbers:
                 self._data = df
                 if options.validate:
@@ -410,6 +412,7 @@ class StreamingDataExtractor(DataExtractor):
             frame_to_hyper(df, database=file_path, table=table_name, table_mode='a')
 
     def stream_sql_query_to_csv(self, file_path, query, connection, row_counter=0, **kwargs) -> int:
+        from mario.query_builder import get_formatted_query
         options = CsvOptions(**kwargs)
         if options.compress_using_gzip:
             compression_options = dict(method='gzip')
@@ -420,7 +423,8 @@ class StreamingDataExtractor(DataExtractor):
         mode = 'w'
         header = True
 
-        for df in pd.read_sql(sql=query[0], params=query[1], con=connection, chunksize=options.chunk_size):
+        for df in pd.read_sql(get_formatted_query(query[0], query[1]), connection, chunksize=options.chunk_size):
+            df = self.mapping.df_to_logical(df)
             if options.validate or options.minimise:
                 self._data = df
                 if options.validate:
@@ -544,6 +548,7 @@ class PartitioningExtractor(StreamingDataExtractor):
     A data extractor that loads from SQL in batches using a specified constraint
     to partition by
     """
+
     def __init__(self,
                  configuration: Configuration,
                  dataset_specification: DatasetSpecification,
@@ -670,5 +675,3 @@ class PartitioningExtractor(StreamingDataExtractor):
                 else:
                     logger.info(f"Saving {options.chunk_size} rows to file")
                     frame_to_hyper(df, database=file_path, table=table_name, table_mode='a')
-
-

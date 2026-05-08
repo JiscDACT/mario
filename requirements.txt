@@ -5,3 +5,6 @@ tableau-builder==0.18
 pypika
 sqlalchemy
 openpyxl
+pyathena
+awswrangler
+boto3
