@@ -170,7 +170,7 @@ class DataExtractor:
         if self._data is None:
             self.__load__()
         if 'row_number' in self._data.columns:
-            self._data = self._data .drop(columns=['row_number'])
+            self._data = self._data.drop(columns=['row_number'])
 
     def save_query(self, file_path: str, formatted: bool = False):
         """
@@ -228,6 +228,7 @@ class HyperFile(DataExtractor):
     Wrapper for a HyperFile as a data extractor - use when no data needs to be extracted,
     and we just want to treat a hyper as a hyper with no conversion to/from dataframe
     """
+
     def __init__(self,
                  configuration: Configuration,
                  dataset_specification: DatasetSpecification,
@@ -288,7 +289,7 @@ class HyperFile(DataExtractor):
             )
         save_hyper_as_hyper(hyper_file=self.configuration.file_path, file_path=file_path, **kwargs)
 
-    def save_data_as_csv(self,file_path: str, **kwargs):
+    def save_data_as_csv(self, file_path: str, **kwargs):
         from mario.hyper_utils import save_hyper_as_csv
         options = CsvOptions(**kwargs)
         if options.minimise:
@@ -308,6 +309,7 @@ class StreamingDataExtractor(DataExtractor):
     supporting streaming data from SQL to output formats without
     holding any data in memory using a data frame
     """
+
     def __init__(self,
                  configuration: Configuration,
                  dataset_specification: DatasetSpecification,
@@ -410,6 +412,7 @@ class StreamingDataExtractor(DataExtractor):
             frame_to_hyper(df, database=file_path, table=table_name, table_mode='a')
 
     def stream_sql_query_to_csv(self, file_path, query, connection, row_counter=0, **kwargs) -> int:
+        from mario.query_builder import get_formatted_query
         options = CsvOptions(**kwargs)
         if options.compress_using_gzip:
             compression_options = dict(method='gzip')
@@ -545,6 +548,7 @@ class PartitioningExtractor(StreamingDataExtractor):
     A data extractor that loads from SQL in batches using a specified constraint
     to partition by
     """
+
     def __init__(self,
                  configuration: Configuration,
                  dataset_specification: DatasetSpecification,
@@ -671,5 +675,3 @@ class PartitioningExtractor(StreamingDataExtractor):
                 else:
                     logger.info(f"Saving {options.chunk_size} rows to file")
                     frame_to_hyper(df, database=file_path, table=table_name, table_mode='a')
-
-
