@@ -8,6 +8,7 @@ from mario.data_extractor import Configuration
 from mario.dataset_specification import DatasetSpecification
 from mario.metadata import Metadata
 from mario.mapping import FieldMapping
+from mario.utils import to_snake_case
 
 logger = logging.getLogger(__name__)
 
@@ -172,7 +173,7 @@ class SubsetQueryBuilder(QueryBuilder):
             column = self.mapping.as_physical[constraint.item]
             placeholders = []
             for i in range(len(constraint.allowed_values)):
-                parameter_name = column.replace(" ", "_") + str(i)
+                parameter_name = to_snake_case(column) + str(i)
                 # Postgres style.
                 # TODO Probably need some way of identifying which parameter style to apply.
                 parameter = Parameter('%('+parameter_name+')s')
