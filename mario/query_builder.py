@@ -1,4 +1,5 @@
 import logging
+import re
 from copy import copy
 from typing import List
 
@@ -172,7 +173,8 @@ class SubsetQueryBuilder(QueryBuilder):
             column = self.mapping.as_physical[constraint.item]
             placeholders = []
             for i in range(len(constraint.allowed_values)):
-                parameter_name = column.replace(" ", "_") + str(i)
+                safe_column = re.sub(r'[^a-zA-Z0-9]', '_', column)
+                parameter_name = safe_column + str(i)
                 # Postgres style.
                 # TODO Probably need some way of identifying which parameter style to apply.
                 parameter = Parameter('%('+parameter_name+')s')
