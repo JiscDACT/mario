@@ -29,3 +29,13 @@ def gzip_file(input_path, output_path=None):
     with open(input_path, "rb") as f_in, gzip.open(output_path, "wb") as f_out:
         shutil.copyfileobj(f_in, f_out)
     return output_path
+
+
+def decompress_gzip_file(input_path, output_path=None):
+    import gzip
+    import shutil
+    if output_path is None:
+        output_path = input_path.removesuffix(".gz")
+    with gzip.open(input_path, "rb") as f_in, open(output_path, "wb") as f_out:
+        shutil.copyfileobj(f_in, f_out)
+    return output_path
