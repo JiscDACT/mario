@@ -108,6 +108,7 @@ class SubsetQueryBuilder(QueryBuilder):
         TODO make this more generic
         """
         measures = []
+        measure = self.mapping.as_physical[measure]
         if measure is None:
             for measure in self.dataset_specification.measures:
                 # Decide column name based on whether 'subject' fields are present

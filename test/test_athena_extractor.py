@@ -56,6 +56,37 @@ def get_test_conf():
 
     return dataset, metadata, config
 
+def get_test_conf_tdsa():
+    dataset = DatasetSpecification()
+    dataset.dimensions = [
+        "Academic Year",
+        "Mode of study",
+        "Country of HE provider"
+    ]
+    dataset.measures = ['Unrounded FPE']
+    dataset.name = 'v_sp_student_fpe'
+    metadata = Metadata()
+    academic_year = Item()
+    academic_year.name = 'Academic Year'
+    mode_of_study = Item()
+    mode_of_study.name = 'Mode of study'
+    mode_of_study.set_property('domain', ['Full-time', 'Part-time'])
+    country_of_he_provider = Item()
+    country_of_he_provider.name = 'Country of HE provider'
+    country_of_he_provider.set_property('domain', ['England', 'Wales', 'Scotland', 'Northern Ireland'])
+    fpe_field = Item()
+    fpe_field.name = 'Unrounded FPE'
+    metadata.add_item(academic_year)
+    metadata.add_item(mode_of_study)
+    metadata.add_item(fpe_field)
+    metadata.add_item(country_of_he_provider)
+
+    config = AthenaConfiguration()
+    config.aws_s3_staging_dir = AWS_ATHENA_RESULTS_DIR
+    config.aws_region_name = AWS_REGION
+
+    return dataset, metadata, config
+
 
 def test_athena_count():
     if not AWS_PROFILE or not AWS_ATHENA_RESULTS_DIR or not AWS_REGION:
@@ -75,6 +106,23 @@ def test_athena_count():
     total = extractor.get_total(measure=dataset.measures[0])
     assert total == 28_733_910
 
+def test_athena_count_with_space():
+    if not AWS_PROFILE or not AWS_ATHENA_RESULTS_DIR or not AWS_REGION:
+        pytest.skip("Skipping Athena test as AWS not configured")
+
+    dataset, metadata, cfg = get_test_conf_tdsa()
+    cfg.query_builder = SubsetQueryBuilder
+    cfg.schema = 'dev'
+    cfg.view = 'v_sp_student_fpe'
+
+    extractor = AthenaDataExtractor(
+        configuration=cfg,
+        metadata=metadata,
+        dataset_specification=dataset
+    )
+
+    total = extractor.get_total(measure=dataset.measures[0])
+    assert total == 3_332_785
 
 def test_athena_save_data_as_csv():
     if not AWS_PROFILE or not AWS_ATHENA_RESULTS_DIR or not AWS_REGION:
