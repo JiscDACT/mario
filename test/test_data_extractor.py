@@ -558,7 +558,8 @@ def test_hyper_to_csv():
         minimise=False,
         compress_using_gzip=False
     )
-    assert extractor.get_total() == 10194
+    assert extractor.get_row_count() == 10194
+    assert  round(extractor.get_total(), 2) == 2326534.35
     assert round(extractor.get_total(measure='Sales'), 2) == 2326534.35
 
     df = pd.read_csv(output_file)
@@ -591,7 +592,7 @@ def test_hyper_to_csv_without_copy_to_tmp():
         compress_using_gzip=False,
         do_not_modify_source=False
     )
-    assert extractor.get_total() == 10194
+    assert extractor.get_row_count() == 10194
     assert round(extractor.get_total(measure='Sales'), 2) == 2326534.35
 
     df = pd.read_csv(output_file)
@@ -625,11 +626,12 @@ def test_hyper_to_csv_without_using_pantab():
         do_not_modify_source=False,
         use_pantab=False
     )
-    assert extractor.get_total() == 10194
+    assert extractor.get_row_count() == 10194
     assert round(extractor.get_total(measure='Sales'), 2) == 2326534.35
 
     df = pd.read_csv(output_file)
     assert round(df['Sales'].sum(), 4) == 2326534.3543
+
 
 def test_partitioning_extractor_partition_sql_no_data_in_partition():
     # Skip this test if we don't have a connection string
