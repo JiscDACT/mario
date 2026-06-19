@@ -806,3 +806,68 @@ def test_partitioning_extractor_with_row_numbers_apostrophes():
     columns = pd.read_csv(csv_file).columns
     # Check row_number omitted in CSV output
     assert 'row_number' not in columns
+
+
+def test_consistency_across_extractors(tmp_path):
+    """
+    Ensure get_row_count and get_total are consistent across:
+    - DataExtractor (CSV)
+    - HyperFile (Hyper)
+    """
+
+    # --- Setup dataset / metadata ---
+    dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
+    metadata = metadata_from_json(os.path.join('test', 'metadata.json'))
+
+    csv_path = os.path.join('test', 'orders.csv')
+
+    # --- 1. DataExtractor (baseline) ---
+    base_config = Configuration(file_path=csv_path)
+    base_extractor = DataExtractor(
+        dataset_specification=dataset,
+        metadata=metadata,
+        configuration=base_config
+    )
+
+    base_extractor.validate_data()
+
+    base_row_count = base_extractor.get_row_count()
+    base_total_default = base_extractor.get_total()
+
+    # choose explicit measures
+    measures = dataset.measures.copy()
+    measures.remove('Profit Ratio')  # This is a calculation!
+
+    base_totals = {
+        m: base_extractor.get_total(measure=m)
+        for m in measures
+    }
+
+    # --- 2. Convert to Hyper ---
+    hyper_path = tmp_path / "test.hyper"
+
+    base_extractor.save_data_as_hyper(file_path=str(hyper_path))
+
+    # --- 3. HyperFile ---
+    hyper_config = Configuration(file_path=str(hyper_path))
+
+    hyper_extractor = HyperFile(
+        dataset_specification=dataset,
+        metadata=metadata,
+        configuration=hyper_config
+    )
+
+    hyper_row_count = hyper_extractor.get_row_count()
+    hyper_total_default = hyper_extractor.get_total()
+
+    hyper_totals = {
+        m: hyper_extractor.get_total(measure=m)
+        for m in measures
+    }
+
+    # --- Assertions: STRICT consistency ---
+    assert hyper_row_count == base_row_count
+    assert round(hyper_total_default, 6) == round(base_total_default, 6)
+
+    for m in measures:
+        assert round(hyper_totals[m], 6) == round(base_totals[m], 6)
