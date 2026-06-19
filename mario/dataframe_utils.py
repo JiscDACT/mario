@@ -66,10 +66,22 @@ def get_column_types(metadata: Metadata) -> dict[str, str]:
 def to_bool(x):
     if pd.isna(x):
         return pd.NA
-    x_str = str(x).lower()
-    if x_str in {"true", "1"}:
+
+    if isinstance(x, bool):
+        return x
+
+    # Handle numeric types explicitly
+    if isinstance(x, (int, float)):
+        if x == 1:
+            return True
+        if x == 0:
+            return False
+        return pd.NA
+
+    x_str = str(x).lower().strip()
+    if x_str in {"true", "1", "1.0"}:
         return True
-    if x_str in {"false", "0"}:
+    if x_str in {"false", "0", "0.0"}:
         return False
     return pd.NA
 

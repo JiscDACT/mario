@@ -1,5 +1,5 @@
 import tempfile
-from mario.dataframe_utils import get_column_type, get_column_types, hyper_to_df, csv_to_df
+from mario.dataframe_utils import get_column_type, get_column_types, hyper_to_df, csv_to_df, to_bool
 import pytest
 import pandas as pd
 import os
@@ -291,3 +291,68 @@ def test_hyper_to_df_invalid_datetime():
 
     assert pd.api.types.is_datetime64_any_dtype(df["a"])
     assert pd.isna(df["a"].iloc[1])
+
+
+@pytest.mark.parametrize("value", [
+    True, 1, 1.0, "1", "1.0", "true", "TRUE", " True "
+])
+def test_to_bool_true_values(value):
+    assert to_bool(value) is True
+
+
+@pytest.mark.parametrize("value", [
+    False, 0, 0.0, "0", "0.0", "false", "FALSE", " False "
+])
+def test_to_bool_false_values(value):
+    assert to_bool(value) is False
+
+
+@pytest.mark.parametrize("value", [
+    None, pd.NA, float("nan")
+])
+def test_to_bool_null_values(value):
+    result = to_bool(value)
+    assert result is pd.NA or pd.isna(result)
+
+
+@pytest.mark.parametrize("value", [
+    2,
+    -1,
+    0.5,
+    "yes",
+    "no",
+    "random",
+    "1.00",   # not currently supported
+    "0.00",
+    "1e0",
+    "0e0",
+])
+def test_to_bool_invalid_values(value):
+    result = to_bool(value)
+    assert result is pd.NA or pd.isna(result)
+
+
+def test_to_bool_boolean_passthrough():
+    assert to_bool(True) is True
+    assert to_bool(False) is False
+
+
+def test_to_bool_returns_expected_types():
+    assert isinstance(to_bool(True), bool)
+    assert isinstance(to_bool(1), bool)
+    assert to_bool("invalid") is pd.NA or pd.isna(to_bool("invalid"))
+
+
+def test_to_bool_with_series():
+    s = pd.Series(["1", "0", "true", "false", "invalid", None])
+
+    result = s.map(to_bool)
+
+    expected = pd.Series([True, False, True, False, pd.NA, pd.NA], dtype="object")
+
+    # Compare values (handle NA properly)
+    for r, e in zip(result, expected):
+        if pd.isna(e):
+            assert pd.isna(r)
+        else:
+            assert r == e
