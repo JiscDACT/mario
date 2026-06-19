@@ -131,11 +131,28 @@ class DataExtractor:
                 raise ValueError(f"Measure {measure} does not exist in dataset specification")
         return measure
 
-    def get_total(self, measure=None):
+    def get_row_count(self):
+        """
+        :return: the number of rows in the data
+        """
         df = self.get_data_frame()
+        return len(df)
+
+    def get_total(self, measure=None):
+        """
+        Returns the total from the dataset, using either the supplied measure, or
+        the default measure from the dataset specification if no measure is supplied.
+        If an invalid measure is supplied, a ValueError will be raised.
+        If no measure is supplied, and no measure exists in the dataset, the row_count()
+        is returned instead.
+        :param measure: the measure to use
+        :return: the sum of the data with the measure
+        """
         measure = self.__get_measure__(measure)
         if measure is None:
-            return len(df)
+            return self.get_row_count()
+
+        df = self.get_data_frame()
         self._total = df[measure].sum()
         return self._total
 
@@ -256,22 +273,30 @@ class HyperFile(DataExtractor):
             table=table
         )
 
-    def get_total(self, measure=None):
-        from mario.hyper_utils import get_row_count, get_default_table_and_schema, get_total
+    def get_row_count(self):
+        from mario.hyper_utils import get_row_count as __get_row_count__
+        from mario.hyper_utils import get_default_table_and_schema
         schema, table = get_default_table_and_schema(self.configuration.file_path)
+        return __get_row_count__ (
+            hyper_file_path=self.configuration.file_path,
+            schema=schema,
+            table=table
+        )
+
+    def get_total(self, measure=None):
+        measure = self.__get_measure__(measure)
         if measure is None:
-            return get_row_count(
-                hyper_file_path=self.configuration.file_path,
-                schema=schema,
-                table=table
-            )
-        else:
-            return get_total(
-                hyper_file_path=self.configuration.file_path,
-                schema=schema,
-                table=table,
-                measure=measure
-            )
+            return self.get_row_count()
+
+        from mario.hyper_utils import get_total as __get_total__
+        from mario.hyper_utils import get_default_table_and_schema
+        schema, table = get_default_table_and_schema(self.configuration.file_path)
+        return  __get_total__(
+            hyper_file_path=self.configuration.file_path,
+            schema=schema,
+            table=table,
+            measure=measure
+        )
 
     def save_data_as_hyper(self, file_path: str, **kwargs):
         from mario.hyper_utils import save_hyper_as_hyper, add_row_numbers_to_hyper, get_default_table_and_schema
@@ -360,26 +385,33 @@ class StreamingDataExtractor(DataExtractor):
             **kwargs
         )
 
+    def __get_total__(self, measure):
+        if self.configuration.query_builder is not None:
+            from mario.query_builder import QueryBuilder
+            logger.info("Building totals query")
+            query_builder: QueryBuilder = self.configuration.query_builder(
+                configuration=self.configuration,
+                metadata=self.metadata,
+                dataset_specification=self.dataset_specification)
+            totals_query = query_builder.create_totals_query(measure=measure)
+            totals_df = pd.read_sql(totals_query[0], self.get_connection(), params=totals_query[1])
+            return totals_df.iat[0, 0]
+        else:
+            raise NotImplementedError
+
+    def get_row_count(self):
+        return self.__get_total__(None)
+
     def get_total(self, measure=None):
         """
         For totals when streaming data we need to run a totals SQL query separate
         from the main query and use the results of this
         :return: the total value of the query
         """
-        logger.info("Building totals query")
         measure = self.__get_measure__(measure)
-        if self.configuration.query_builder is not None:
-            from mario.query_builder import QueryBuilder
-            query_builder: QueryBuilder = self.configuration.query_builder(
-                configuration=self.configuration,
-                metadata=self.metadata,
-                dataset_specification=self.dataset_specification)
-            totals_query = query_builder.create_totals_query(measure=measure)
-        else:
-            raise NotImplementedError
-
-        totals_df = pd.read_sql(totals_query[0], self.get_connection(), params=totals_query[1])
-        return totals_df.iat[0, 0]
+        if measure is None:
+            return self.get_row_count()
+        return self.__get_total__(measure)
 
     def stream_sql_to_hyper(self, file_path: str, **kwargs):
         """
@@ -607,6 +639,9 @@ class PartitioningExtractor(StreamingDataExtractor):
             self.__load_from_sql_using_partition__(partition_value=value)
 
     def get_data_frame(self, minimise=True, include_row_numbers=False) -> DataFrame:
+        raise NotImplementedError()
+
+    def get_row_count(self):
         raise NotImplementedError()
 
     def get_total(self, measure=None):

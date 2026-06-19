@@ -518,7 +518,7 @@ def test_partitioning_extractor_streaming():
 
 def test_hyper_total_measure():
     dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
-    dataset.measures = []
+    dataset.measures = ['Sales']
     metadata = metadata_from_json(os.path.join('test', 'metadata.json'))
     configuration = Configuration(
         file_path=os.path.join('test', 'orders.hyper')
@@ -528,13 +528,19 @@ def test_hyper_total_measure():
         metadata=metadata,
         configuration=configuration
     )
-    assert extractor.get_total() == 10194
+
+    assert extractor.get_row_count() == 10194
     assert extractor.get_total(measure='Sales') == 2326534.354299952
+    # Defaults to "Sales" as measure is in dataset.measures()
+    assert extractor.get_total() == 2326534.354299952
+    # Raise ValueError if measure not in dataset.measures()
+    with pytest.raises(ValueError):
+        extractor.get_total(measure='Stuff')
 
 
 def test_hyper_to_csv():
     dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
-    dataset.measures = []
+    dataset.measures = ['Sales']
     metadata = metadata_from_json(os.path.join('test', 'metadata.json'))
     configuration = Configuration(
         file_path=os.path.join('test', 'orders.hyper')
@@ -558,9 +564,10 @@ def test_hyper_to_csv():
     df = pd.read_csv(output_file)
     assert round(df['Sales'].sum(), 4) == 2326534.3543
 
+
 def test_hyper_to_csv_without_copy_to_tmp():
     dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
-    dataset.measures = []
+    dataset.measures = ['Sales']
     metadata = metadata_from_json(os.path.join('test', 'metadata.json'))
     # Copy the source data to avoid overwriting during other pytest runs
     shutil.copyfile(
@@ -590,9 +597,10 @@ def test_hyper_to_csv_without_copy_to_tmp():
     df = pd.read_csv(output_file)
     assert round(df['Sales'].sum(), 4) == 2326534.3543
 
+
 def test_hyper_to_csv_without_using_pantab():
     dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
-    dataset.measures = []
+    dataset.measures = ['Sales']
     metadata = metadata_from_json(os.path.join('test', 'metadata.json'))
     # Copy the source data to avoid overwriting during other pytest runs
     shutil.copyfile(
