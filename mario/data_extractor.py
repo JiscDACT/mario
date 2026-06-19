@@ -12,6 +12,11 @@ from mario.mapping import FieldMapping
 logger = logging.getLogger(__name__)
 
 
+GET_TOTAL_WITHOUT_MEASURE = 'Deprecation warning: Calling get_total() without any measure specified, or with None, ' \
+                            'is going to be deprecated in future. Instead you should either call get_row_count(), ' \
+                            'or get_total(measure) where the measure exists in the dataset.'
+
+
 class Configuration:
     """
     Configuration for a data extractor. This can include:
@@ -148,6 +153,8 @@ class DataExtractor:
         :param measure: the measure to use
         :return: the sum of the data with the measure
         """
+        if measure is None:
+            logger.warning(GET_TOTAL_WITHOUT_MEASURE)
         measure = self.__get_measure__(measure)
         if measure is None:
             return self.get_row_count()
@@ -284,6 +291,8 @@ class HyperFile(DataExtractor):
         )
 
     def get_total(self, measure=None):
+        if measure is None:
+            logger.warning(GET_TOTAL_WITHOUT_MEASURE)
         measure = self.__get_measure__(measure)
         if measure is None:
             return self.get_row_count()
@@ -408,6 +417,8 @@ class StreamingDataExtractor(DataExtractor):
         from the main query and use the results of this
         :return: the total value of the query
         """
+        if measure is None:
+            logger.warning(GET_TOTAL_WITHOUT_MEASURE)
         measure = self.__get_measure__(measure)
         if measure is None:
             return self.get_row_count()

@@ -1,5 +1,5 @@
 from pyathena import connect
-from mario.data_extractor import DataExtractor, Configuration
+from mario.data_extractor import DataExtractor, Configuration, GET_TOTAL_WITHOUT_MEASURE
 import logging
 import datetime
 import numbers
@@ -82,6 +82,8 @@ class AthenaDataExtractor(DataExtractor):
         :return: the total value of the query
         NOTE this is a direct copy from StreamingDataExtractor
         """
+        if measure is None:
+            logger.warning(GET_TOTAL_WITHOUT_MEASURE)
         measure = self.__get_measure__(measure)
         if measure is None:
             return self.get_row_count()
