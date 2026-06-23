@@ -106,6 +106,26 @@ def test_athena_count():
     total = extractor.get_total(measure=dataset.measures[0])
     assert total == 28_733_910
 
+
+def test_athena_row_count():
+    if not AWS_PROFILE or not AWS_ATHENA_RESULTS_DIR or not AWS_REGION:
+        pytest.skip("Skipping Athena test as AWS not configured")
+
+    dataset, metadata, cfg = get_test_conf()
+    cfg.query_builder = SubsetQueryBuilder
+    cfg.schema = 'demo'
+    cfg.view = 'student_open_data'
+
+    extractor = AthenaDataExtractor(
+        configuration=cfg,
+        metadata=metadata,
+        dataset_specification=dataset
+    )
+
+    total = extractor.get_row_count()
+    assert total == 28_733_910
+
+
 def test_athena_count_with_space():
     if not AWS_PROFILE or not AWS_ATHENA_RESULTS_DIR or not AWS_REGION:
         pytest.skip("Skipping Athena test as AWS not configured")
