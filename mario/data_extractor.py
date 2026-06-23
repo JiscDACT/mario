@@ -143,6 +143,11 @@ class DataExtractor:
         df = self.get_data_frame()
         return len(df)
 
+    def __get_total__(self, measure):
+        df = self.get_data_frame()
+        self._total = df[measure].sum()
+        return self._total
+
     def get_total(self, measure=None):
         """
         Returns the total from the dataset, using either the supplied measure, or
@@ -158,10 +163,7 @@ class DataExtractor:
         measure = self.__get_measure__(measure)
         if measure is None:
             return self.get_row_count()
-
-        df = self.get_data_frame()
-        self._total = df[measure].sum()
-        return self._total
+        return self.__get_total__(measure)
 
     def validate_data(self, allow_nulls=True):
         from mario.validation import DataFrameValidator
@@ -290,13 +292,7 @@ class HyperFile(DataExtractor):
             table=table
         )
 
-    def get_total(self, measure=None):
-        if measure is None:
-            logger.warning(GET_TOTAL_WITHOUT_MEASURE)
-        measure = self.__get_measure__(measure)
-        if measure is None:
-            return self.get_row_count()
-
+    def __get_total__(self, measure):
         from mario.hyper_utils import get_total as __get_total__
         from mario.hyper_utils import get_default_table_and_schema
         schema, table = get_default_table_and_schema(self.configuration.file_path)
@@ -306,6 +302,14 @@ class HyperFile(DataExtractor):
             table=table,
             measure=measure
         )
+
+    def get_total(self, measure=None):
+        if measure is None:
+            logger.warning(GET_TOTAL_WITHOUT_MEASURE)
+        measure = self.__get_measure__(measure)
+        if measure is None:
+            return self.get_row_count()
+        return self.__get_total__(measure)
 
     def save_data_as_hyper(self, file_path: str, **kwargs):
         from mario.hyper_utils import save_hyper_as_hyper, add_row_numbers_to_hyper, get_default_table_and_schema
