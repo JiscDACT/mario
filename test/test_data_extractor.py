@@ -808,6 +808,130 @@ def test_partitioning_extractor_with_row_numbers_apostrophes():
     assert 'row_number' not in columns
 
 
+def test_streaming_extractor_get_row_count():
+    # Skip if no DB configured
+    if not os.environ.get('CONNECTION_STRING'):
+        pytest.skip("Skipping SQL test as no database configured")
+
+    dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
+    metadata = metadata_from_json(os.path.join('test', 'metadata.json'))
+
+    configuration = Configuration(
+        connection_string=os.environ.get('CONNECTION_STRING'),
+        schema="dev",
+        view="superstore",
+        query_builder=ViewBasedQueryBuilder
+    )
+
+    extractor = StreamingDataExtractor(
+        dataset_specification=dataset,
+        metadata=metadata,
+        configuration=configuration
+    )
+
+    # Trigger streaming so internal totals/row_count are computed
+    with tempfile.NamedTemporaryFile(suffix=".csv") as file:
+        extractor.stream_sql_to_csv(file_path=file.name, chunk_size=1000)
+
+    # Validate row count
+    assert extractor.get_row_count() == 10194
+
+
+def test_streaming_extractor_get_total():
+    # Skip if no DB configured
+    if not os.environ.get('CONNECTION_STRING'):
+        pytest.skip("Skipping SQL test as no database configured")
+
+    dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
+    metadata = metadata_from_json(os.path.join('test', 'metadata.json'))
+
+    configuration = Configuration(
+        connection_string=os.environ.get('CONNECTION_STRING'),
+        schema="dev",
+        view="superstore",
+        query_builder=ViewBasedQueryBuilder
+    )
+
+    extractor = StreamingDataExtractor(
+        dataset_specification=dataset,
+        metadata=metadata,
+        configuration=configuration
+    )
+
+    with tempfile.NamedTemporaryFile(suffix=".csv") as file:
+        extractor.stream_sql_to_csv(file_path=file.name, chunk_size=1000)
+
+    # Default measure (dataset.measures[0])
+    total_default = extractor.get_total()
+
+    # Explicit measure
+    total_sales = extractor.get_total(measure="Sales")
+
+    assert round(total_default, 6) == round(2326534.3543, 6)
+    assert round(total_sales, 6) == round(2326534.3543, 6)
+
+
+def test_streaming_extractor_get_total_multiple_measures():
+    if not os.environ.get('CONNECTION_STRING'):
+        pytest.skip("Skipping SQL test as no database configured")
+
+    dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
+    dataset.measures = ['Sales', 'Profit']
+
+    metadata = metadata_from_json(os.path.join('test', 'metadata.json'))
+
+    configuration = Configuration(
+        connection_string=os.environ.get('CONNECTION_STRING'),
+        schema="dev",
+        view="superstore",
+        query_builder=ViewBasedQueryBuilder
+    )
+
+    extractor = StreamingDataExtractor(
+        dataset_specification=dataset,
+        metadata=metadata,
+        configuration=configuration
+    )
+
+    with tempfile.NamedTemporaryFile(suffix=".csv") as file:
+        extractor.stream_sql_to_csv(file_path=file.name, chunk_size=1000)
+
+    assert round(extractor.get_total(measure="Sales"), 4) == 2326534.3543
+    assert round(extractor.get_total(measure="Profit"), 4) == 292296.8146
+
+
+def test_streaming_extractor_get_total_no_measures():
+    if not os.environ.get('CONNECTION_STRING'):
+        pytest.skip("Skipping SQL test as no database configured")
+
+    dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
+    dataset.measures = []  # no measures
+
+    metadata = metadata_from_json(os.path.join('test', 'metadata.json'))
+
+    configuration = Configuration(
+        connection_string=os.environ.get('CONNECTION_STRING'),
+        schema="dev",
+        view="superstore",
+        query_builder=ViewBasedQueryBuilder
+    )
+
+    extractor = StreamingDataExtractor(
+        dataset_specification=dataset,
+        metadata=metadata,
+        configuration=configuration
+    )
+
+    with tempfile.NamedTemporaryFile(suffix=".csv") as file:
+        extractor.stream_sql_to_csv(file_path=file.name, chunk_size=1000)
+
+    # Falls back to row count
+    assert extractor.get_total() == 10194
+
+    with pytest.raises(ValueError):
+        extractor.get_total(measure="Sales")
+
+
 def test_consistency_across_extractors(tmp_path):
     """
     Ensure get_row_count and get_total are consistent across:
