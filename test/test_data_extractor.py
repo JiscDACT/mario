@@ -518,7 +518,7 @@ def test_partitioning_extractor_streaming():
 
 def test_hyper_total_measure():
     dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
-    dataset.measures = []
+    dataset.measures = ['Sales']
     metadata = metadata_from_json(os.path.join('test', 'metadata.json'))
     configuration = Configuration(
         file_path=os.path.join('test', 'orders.hyper')
@@ -528,13 +528,19 @@ def test_hyper_total_measure():
         metadata=metadata,
         configuration=configuration
     )
-    assert extractor.get_total() == 10194
+
+    assert extractor.get_row_count() == 10194
     assert extractor.get_total(measure='Sales') == 2326534.354299952
+    # Defaults to "Sales" as measure is in dataset.measures()
+    assert extractor.get_total() == 2326534.354299952
+    # Raise ValueError if measure not in dataset.measures()
+    with pytest.raises(ValueError):
+        extractor.get_total(measure='Stuff')
 
 
 def test_hyper_to_csv():
     dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
-    dataset.measures = []
+    dataset.measures = ['Sales']
     metadata = metadata_from_json(os.path.join('test', 'metadata.json'))
     configuration = Configuration(
         file_path=os.path.join('test', 'orders.hyper')
@@ -552,15 +558,17 @@ def test_hyper_to_csv():
         minimise=False,
         compress_using_gzip=False
     )
-    assert extractor.get_total() == 10194
+    assert extractor.get_row_count() == 10194
+    assert  round(extractor.get_total(), 2) == 2326534.35
     assert round(extractor.get_total(measure='Sales'), 2) == 2326534.35
 
     df = pd.read_csv(output_file)
     assert round(df['Sales'].sum(), 4) == 2326534.3543
 
+
 def test_hyper_to_csv_without_copy_to_tmp():
     dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
-    dataset.measures = []
+    dataset.measures = ['Sales']
     metadata = metadata_from_json(os.path.join('test', 'metadata.json'))
     # Copy the source data to avoid overwriting during other pytest runs
     shutil.copyfile(
@@ -584,15 +592,16 @@ def test_hyper_to_csv_without_copy_to_tmp():
         compress_using_gzip=False,
         do_not_modify_source=False
     )
-    assert extractor.get_total() == 10194
+    assert extractor.get_row_count() == 10194
     assert round(extractor.get_total(measure='Sales'), 2) == 2326534.35
 
     df = pd.read_csv(output_file)
     assert round(df['Sales'].sum(), 4) == 2326534.3543
 
+
 def test_hyper_to_csv_without_using_pantab():
     dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
-    dataset.measures = []
+    dataset.measures = ['Sales']
     metadata = metadata_from_json(os.path.join('test', 'metadata.json'))
     # Copy the source data to avoid overwriting during other pytest runs
     shutil.copyfile(
@@ -617,11 +626,12 @@ def test_hyper_to_csv_without_using_pantab():
         do_not_modify_source=False,
         use_pantab=False
     )
-    assert extractor.get_total() == 10194
+    assert extractor.get_row_count() == 10194
     assert round(extractor.get_total(measure='Sales'), 2) == 2326534.35
 
     df = pd.read_csv(output_file)
     assert round(df['Sales'].sum(), 4) == 2326534.3543
+
 
 def test_partitioning_extractor_partition_sql_no_data_in_partition():
     # Skip this test if we don't have a connection string
@@ -796,3 +806,192 @@ def test_partitioning_extractor_with_row_numbers_apostrophes():
     columns = pd.read_csv(csv_file).columns
     # Check row_number omitted in CSV output
     assert 'row_number' not in columns
+
+
+def test_streaming_extractor_get_row_count():
+    # Skip if no DB configured
+    if not os.environ.get('CONNECTION_STRING'):
+        pytest.skip("Skipping SQL test as no database configured")
+
+    dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
+    metadata = metadata_from_json(os.path.join('test', 'metadata.json'))
+
+    configuration = Configuration(
+        connection_string=os.environ.get('CONNECTION_STRING'),
+        schema="dev",
+        view="superstore",
+        query_builder=ViewBasedQueryBuilder
+    )
+
+    extractor = StreamingDataExtractor(
+        dataset_specification=dataset,
+        metadata=metadata,
+        configuration=configuration
+    )
+
+    # Trigger streaming so internal totals/row_count are computed
+    with tempfile.NamedTemporaryFile(suffix=".csv") as file:
+        extractor.stream_sql_to_csv(file_path=file.name, chunk_size=1000)
+
+    # Validate row count
+    assert extractor.get_row_count() == 10194
+
+
+def test_streaming_extractor_get_total():
+    # Skip if no DB configured
+    if not os.environ.get('CONNECTION_STRING'):
+        pytest.skip("Skipping SQL test as no database configured")
+
+    dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
+    metadata = metadata_from_json(os.path.join('test', 'metadata.json'))
+
+    configuration = Configuration(
+        connection_string=os.environ.get('CONNECTION_STRING'),
+        schema="dev",
+        view="superstore",
+        query_builder=ViewBasedQueryBuilder
+    )
+
+    extractor = StreamingDataExtractor(
+        dataset_specification=dataset,
+        metadata=metadata,
+        configuration=configuration
+    )
+
+    with tempfile.NamedTemporaryFile(suffix=".csv") as file:
+        extractor.stream_sql_to_csv(file_path=file.name, chunk_size=1000)
+
+    # Default measure (dataset.measures[0])
+    total_default = extractor.get_total()
+
+    # Explicit measure
+    total_sales = extractor.get_total(measure="Sales")
+
+    assert round(total_default, 6) == round(2326534.3543, 6)
+    assert round(total_sales, 6) == round(2326534.3543, 6)
+
+
+def test_streaming_extractor_get_total_multiple_measures():
+    if not os.environ.get('CONNECTION_STRING'):
+        pytest.skip("Skipping SQL test as no database configured")
+
+    dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
+    dataset.measures = ['Sales', 'Profit']
+
+    metadata = metadata_from_json(os.path.join('test', 'metadata.json'))
+
+    configuration = Configuration(
+        connection_string=os.environ.get('CONNECTION_STRING'),
+        schema="dev",
+        view="superstore",
+        query_builder=ViewBasedQueryBuilder
+    )
+
+    extractor = StreamingDataExtractor(
+        dataset_specification=dataset,
+        metadata=metadata,
+        configuration=configuration
+    )
+
+    with tempfile.NamedTemporaryFile(suffix=".csv") as file:
+        extractor.stream_sql_to_csv(file_path=file.name, chunk_size=1000)
+
+    assert round(extractor.get_total(measure="Sales"), 4) == 2326534.3543
+    assert round(extractor.get_total(measure="Profit"), 4) == 292296.8146
+
+
+def test_streaming_extractor_get_total_no_measures():
+    if not os.environ.get('CONNECTION_STRING'):
+        pytest.skip("Skipping SQL test as no database configured")
+
+    dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
+    dataset.measures = []  # no measures
+
+    metadata = metadata_from_json(os.path.join('test', 'metadata.json'))
+
+    configuration = Configuration(
+        connection_string=os.environ.get('CONNECTION_STRING'),
+        schema="dev",
+        view="superstore",
+        query_builder=ViewBasedQueryBuilder
+    )
+
+    extractor = StreamingDataExtractor(
+        dataset_specification=dataset,
+        metadata=metadata,
+        configuration=configuration
+    )
+
+    with tempfile.NamedTemporaryFile(suffix=".csv") as file:
+        extractor.stream_sql_to_csv(file_path=file.name, chunk_size=1000)
+
+    # Falls back to row count
+    assert extractor.get_total() == 10194
+
+    with pytest.raises(ValueError):
+        extractor.get_total(measure="Sales")
+
+
+def test_consistency_across_extractors(tmp_path):
+    """
+    Ensure get_row_count and get_total are consistent across:
+    - DataExtractor (CSV)
+    - HyperFile (Hyper)
+    """
+
+    # --- Setup dataset / metadata ---
+    dataset = dataset_from_json(os.path.join('test', 'dataset.json'))
+    metadata = metadata_from_json(os.path.join('test', 'metadata.json'))
+
+    csv_path = os.path.join('test', 'orders.csv')
+
+    # --- 1. DataExtractor (baseline) ---
+    base_config = Configuration(file_path=csv_path)
+    base_extractor = DataExtractor(
+        dataset_specification=dataset,
+        metadata=metadata,
+        configuration=base_config
+    )
+
+    base_extractor.validate_data()
+
+    base_row_count = base_extractor.get_row_count()
+    base_total_default = base_extractor.get_total()
+
+    # choose explicit measures
+    measures = dataset.measures.copy()
+    measures.remove('Profit Ratio')  # This is a calculation!
+
+    base_totals = {
+        m: base_extractor.get_total(measure=m)
+        for m in measures
+    }
+
+    # --- 2. Convert to Hyper ---
+    hyper_path = tmp_path / "test.hyper"
+
+    base_extractor.save_data_as_hyper(file_path=str(hyper_path))
+
+    # --- 3. HyperFile ---
+    hyper_config = Configuration(file_path=str(hyper_path))
+
+    hyper_extractor = HyperFile(
+        dataset_specification=dataset,
+        metadata=metadata,
+        configuration=hyper_config
+    )
+
+    hyper_row_count = hyper_extractor.get_row_count()
+    hyper_total_default = hyper_extractor.get_total()
+
+    hyper_totals = {
+        m: hyper_extractor.get_total(measure=m)
+        for m in measures
+    }
+
+    # --- Assertions: STRICT consistency ---
+    assert hyper_row_count == base_row_count
+    assert round(hyper_total_default, 6) == round(base_total_default, 6)
+
+    for m in measures:
+        assert round(hyper_totals[m], 6) == round(base_totals[m], 6)

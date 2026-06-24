@@ -1,5 +1,5 @@
 from pyathena import connect
-from mario.data_extractor import DataExtractor, Configuration
+from mario.data_extractor import DataExtractor, Configuration, GET_TOTAL_WITHOUT_MEASURE
 import logging
 import datetime
 import numbers
@@ -56,18 +56,11 @@ class AthenaDataExtractor(DataExtractor):
             catalog_name=cfg.catalog
         )
 
-    def get_total(self, measure=None):
-        """
-        For totals when streaming data we need to run a totals SQL query separate
-        from the main query and use the results of this
-        :return: the total value of the query
-        NOTE this is a direct copy from StreamingDataExtractor
-        """
+    def __get_total__(self, measure):
         from pandas import read_sql
-        logger.info("Building totals query")
-        measure = self.__get_measure__(measure)
         if self.configuration.query_builder is not None:
             from mario.query_builder import QueryBuilder
+            logger.info("Building totals query")
             query_builder: QueryBuilder = self.configuration.query_builder(
                 configuration=self.configuration,
                 metadata=self.metadata,
@@ -78,6 +71,23 @@ class AthenaDataExtractor(DataExtractor):
 
         totals_df = read_sql(totals_query[0], self.get_connection(), params=totals_query[1])
         return totals_df.iat[0, 0]
+
+    def get_row_count(self):
+        return self.__get_total__(None)
+
+    def get_total(self, measure=None):
+        """
+        For totals when streaming data we need to run a totals SQL query separate
+        from the main query and use the results of this
+        :return: the total value of the query
+        NOTE this is a direct copy from StreamingDataExtractor
+        """
+        if measure is None:
+            logger.warning(GET_TOTAL_WITHOUT_MEASURE)
+        measure = self.__get_measure__(measure)
+        if measure is None:
+            return self.get_row_count()
+        return self.__get_total__(measure)
 
     def run_query(self) -> str:
         """
