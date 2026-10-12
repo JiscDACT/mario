@@ -1,9 +1,8 @@
-from typing import List
-
-import pandas as pd
 import csv
 import os
 import tempfile
+
+import pandas as pd
 
 from mario.utils import to_snake_case
 
@@ -13,7 +12,7 @@ class FieldMapping:
     Utility class for holding a set of logical-to-physical item mappings
     """
 
-    def __init__(self, query_format, items: List[str]):
+    def __init__(self, query_format, items: list[str]):
         self._format = query_format
 
         self.as_physical = {}

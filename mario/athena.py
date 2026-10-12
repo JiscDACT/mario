@@ -1,13 +1,13 @@
-import os
-
-from pyathena import connect
-from mario.data_extractor import DataExtractor, Configuration, GET_TOTAL_WITHOUT_MEASURE
-import logging
 import datetime
+import logging
 import numbers
+import os
 import re
-import awswrangler as wr
 
+import awswrangler as wr
+from pyathena import connect
+
+from mario.data_extractor import GET_TOTAL_WITHOUT_MEASURE, Configuration, DataExtractor
 from mario.mapping import rewrite_csv_header_with_fieldmapping
 from mario.options import CsvOptions
 from mario.utils import gzip_file
