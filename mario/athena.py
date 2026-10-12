@@ -143,7 +143,12 @@ class AthenaDataExtractor(DataExtractor):
         wr.s3.download(path=s3_uri, local_file=file_path)
 
         # Rewrite header with FieldMapping
-        rewrite_csv_header_with_fieldmapping(file_path, self.mapping)
+        try:
+            rewrite_csv_header_with_fieldmapping(file_path, self.mapping)
+        except Exception:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+            raise
 
         if options.compress_using_gzip:
             gz_path = gzip_file(file_path)
