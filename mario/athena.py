@@ -1,3 +1,5 @@
+import os
+
 from pyathena import connect
 from mario.data_extractor import DataExtractor, Configuration, GET_TOTAL_WITHOUT_MEASURE
 import logging
@@ -145,6 +147,8 @@ class AthenaDataExtractor(DataExtractor):
 
         if options.compress_using_gzip:
             gz_path = gzip_file(file_path)
+            # Delete original
+            os.remove(file_path)
             return gz_path
 
         return file_path
