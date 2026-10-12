@@ -6,6 +6,7 @@ import logging
 import datetime
 import numbers
 import re
+import awswrangler as wr
 
 from mario.mapping import rewrite_csv_header_with_fieldmapping
 from mario.options import CsvOptions
@@ -97,7 +98,6 @@ class AthenaDataExtractor(DataExtractor):
         result path in S3
         :return: the S3 path where the result is stored
         """
-        import awswrangler as wr
         import boto3
 
         # Build SQL
