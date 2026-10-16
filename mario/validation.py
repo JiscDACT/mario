@@ -1,3 +1,4 @@
+import json
 import logging
 from enum import Enum
 
@@ -247,6 +248,191 @@ class Validator:
             raise ValueError("Data validation failed - check the logs for details")
         return True
 
+
+class ManifestValidator:
+    """
+    Validates a manifest.json against the expected manifest specification.
+    """
+    REQUIRED_PROPERTIES = [ "requested_by","prepared_by","datasource","name",
+        "scope","context","dimensions","measures"]
+
+    EXPECTED_TYPES = {
+        "requested_by": str,"prepared_by": str,"datasource": str,
+        "order_reference": int,"customer_reference": str,"access_until": str,
+        "item_number": int,"onwardsUseCategory": int,"name": str,"scope": str,
+        "context": str,"dimensions": list,"measures": list,"constraints": list,
+        "transformations": list,"years": list}
+
+    VALID_FORMATS = ["csv","excel","excel pivot","parquet",
+                     "csv codes only","excel codes only",
+                     "parquet codes only"]
+
+    def __init__(self, metadata: Metadata = None):
+        self.metadata = metadata
+        self.errors = []
+        self.warnings = []
+
+    def validate(self, manifest_path: str):
+        """Validates a manifest and returns any errors or warnings."""
+        self.errors = []
+        self.warnings = []
+
+        with open(manifest_path, mode="r", encoding="utf-8") as source_file:
+            manifest = json.load(source_file)
+
+        self.check_required_properties(manifest)
+        self.check_property_types(manifest)
+        self.check_format(manifest)
+        self.check_dimensions(manifest)
+        self.check_measures(manifest)
+        self.check_measure_definitions(manifest)
+        self.check_constraint_definitions(manifest)
+
+        if self.metadata is not None:
+            self.check_constraint_domains(manifest)
+            self.check_year_scope(manifest)
+
+        for warning in self.warnings:
+            logger.warning("Manifest validation warning: %s", warning)
+
+        for validation_error in self.errors:
+            logger.error("Manifest validation error: %s", validation_error)
+        return self.errors, self.warnings
+
+    def check_required_properties(self, manifest):
+        """Checks that all mandatory manifest properties are present."""
+        for property_name in self.REQUIRED_PROPERTIES:
+            if property_name not in manifest:
+                self.errors.append(f"Missing required property '{property_name}'")
+
+    def check_format(self, manifest):
+        """Checks that format contains valid supported values."""
+        if "format" not in manifest:
+            return
+        formats = manifest["format"]
+        if isinstance(formats, str):
+            formats = [formats]
+        elif not isinstance(formats, list):
+            self.errors.append("Property 'format' must be a string or list")
+            return
+        for format_name in formats:
+            if format_name not in self.VALID_FORMATS:
+                self.errors.append(f"Unsupported format '{format_name}'")
+
+    def check_property_types(self, manifest):
+        """Checks that manifest properties are of the expected data types."""
+        for property_name, expected_type in self.EXPECTED_TYPES.items():
+            if property_name not in manifest:
+                continue
+            if not isinstance(manifest[property_name], expected_type):
+                self.errors.append(f"Property '{property_name}' must be of type '{expected_type.__name__}'")
+
+    def check_dimensions(self, manifest):
+        """Checks that at least one dimension has been specified."""
+        dimensions = manifest.get("dimensions", [])
+        if not dimensions:
+            self.errors.append("No dimensions specified")
+
+    def check_measures(self, manifest):
+        """Checks that at least one measure has been specified."""
+        measures = manifest.get("measures", [])
+        if not measures:
+            self.errors.append("No measures specified")
+
+    def check_measure_definitions(self, manifest):
+        """Checks that measures contain the required properties."""
+        measures = manifest.get("measures", [])
+        for index, measure in enumerate(measures):
+            if not isinstance(measure, dict):
+                self.errors.append(f"Measure at index {index} must be an object")
+                continue
+            if "name" not in measure:
+                self.errors.append(f"Measure at index {index} is missing 'name'")
+            if "aggregation" not in measure:
+                self.errors.append(f"Measure at index {index} is missing 'aggregation'")
+
+    def check_constraint_definitions(self, manifest):
+        """Checks that constraints contain the required properties."""
+        constraints = manifest.get("constraints", [])
+        for index, constraint in enumerate(constraints):
+            if not isinstance(constraint, dict):
+                self.errors.append(f"Constraint at index {index} must be an object")
+                continue
+            if "item" not in constraint:
+                self.errors.append(f"Constraint at index {index} is missing 'item'")
+            if "allowedValues" not in constraint:
+                self.errors.append(f"Constraint at index {index} is missing 'allowedValues'")
+
+    def check_constraint_domains(self, manifest):
+        """Checks that constraint values exist within the item's valid domain."""
+        constraints = manifest.get("constraints", [])
+        for constraint in constraints:
+            item_name = constraint.get("item")
+            allowed_values = constraint.get("allowedValues", [])
+            if item_name is None:
+                continue
+            metadata_item = self.metadata.get_metadata(item_name)
+            if metadata_item is None:
+                self.errors.append(f"Constraint item '{item_name}' does not exist in metadata")
+                continue
+            domain = metadata_item.get_property("domain")
+            if not domain:
+                continue
+            for value in allowed_values:
+                if value not in domain:
+                    self.errors.append(f"'{value}' is not in domain of '{item_name}'")
+
+    def __get_year_start__(self, year_string: str):
+        """Converts 2021/22 into 2021."""
+        return int(year_string.split("/")[0])
+
+    def __year_in_scope__(self, requested_year: str, metadata_scope):
+        """Returns True if the requested year falls within the metadata scope."""
+        # Handle string-based year scope
+        if isinstance(metadata_scope, str):
+            requested_start = self.__get_year_start__(requested_year)
+            scope = metadata_scope.strip("()")
+            if "and prior" in scope:
+                end_year = self.__get_year_start__(scope.replace(" and prior", ""))
+                return requested_start <= end_year
+            if "onwards" in scope:
+                start_year = self.__get_year_start__(scope.replace(" onwards", ""))
+                return requested_start >= start_year
+            self.warnings.append(
+                f"Unable to validate year scope '{metadata_scope}' "
+                f"because the format is not recognised")
+            return True
+        # Handle explicit list of supported years
+        if isinstance(metadata_scope, list):
+            return requested_year in metadata_scope
+        # Handle unsupported metadata types
+        self.warnings.append(f"Unable to validate year scope '{metadata_scope}' "
+            f"because it is neither a string nor a list")
+        return True
+
+    def check_year_scope(self, manifest):
+        """Checks whether selected dimensions are valid for requested years."""
+        requested_years = manifest.get("years", [])
+        if not requested_years:
+            return
+        dimensions = manifest.get("dimensions", [])
+        for dimension in dimensions:
+            metadata_item = self.metadata.get_metadata(dimension)
+            if metadata_item is None:
+                continue
+            metadata_year_scope = metadata_item.get_property("years")
+            if not metadata_year_scope:
+                self.warnings.append(f"Unable to validate year scope for '{dimension}' because no metadata year scope was provided")
+                continue
+            invalid_years = []
+            for year in requested_years:
+                if not self.__year_in_scope__(year, metadata_year_scope):
+                    invalid_years.append(year)
+            if invalid_years:
+                self.warnings.append(
+                    f"'{dimension}' is not available for requested year(s): "
+                    f"{', '.join(invalid_years)}. Valid scope is "
+                    f"'{metadata_year_scope}'")
 
 class DataFrameValidator(Validator):
     """
