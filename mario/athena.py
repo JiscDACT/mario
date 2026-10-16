@@ -1,10 +1,13 @@
-from pyathena import connect
-from mario.data_extractor import DataExtractor, Configuration, GET_TOTAL_WITHOUT_MEASURE
-import logging
 import datetime
+import logging
 import numbers
+import os
 import re
 
+import awswrangler as wr
+from pyathena import connect
+
+from mario.data_extractor import GET_TOTAL_WITHOUT_MEASURE, Configuration, DataExtractor
 from mario.mapping import rewrite_csv_header_with_fieldmapping
 from mario.options import CsvOptions
 from mario.utils import gzip_file
@@ -95,7 +98,6 @@ class AthenaDataExtractor(DataExtractor):
         result path in S3
         :return: the S3 path where the result is stored
         """
-        import awswrangler as wr
         import boto3
 
         # Build SQL
@@ -141,10 +143,17 @@ class AthenaDataExtractor(DataExtractor):
         wr.s3.download(path=s3_uri, local_file=file_path)
 
         # Rewrite header with FieldMapping
-        rewrite_csv_header_with_fieldmapping(file_path, self.mapping)
+        try:
+            rewrite_csv_header_with_fieldmapping(file_path, self.mapping)
+        except Exception:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+            raise
 
         if options.compress_using_gzip:
             gz_path = gzip_file(file_path)
+            # Delete original
+            os.remove(file_path)
             return gz_path
 
         return file_path

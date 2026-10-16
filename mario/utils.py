@@ -1,6 +1,8 @@
-import os
-from datetime import datetime
 import logging
+import os
+import shutil
+from datetime import datetime
+
 logger = logging.getLogger(__name__)
 
 
@@ -25,11 +27,15 @@ def to_snake_case(name: str) -> str:
 
 def gzip_file(input_path, output_path=None):
     import gzip
-    import shutil
     if output_path is None:
         output_path = input_path + ".gz"
-    with open(input_path, "rb") as f_in, gzip.open(output_path, "wb") as f_out:
-        shutil.copyfileobj(f_in, f_out)
+    try:
+        with open(input_path, "rb") as f_in, gzip.open(output_path, "wb") as f_out:
+            shutil.copyfileobj(f_in, f_out)
+    except Exception:
+        if os.path.exists(output_path):
+            os.remove(output_path)
+        raise
     return output_path
 
 
