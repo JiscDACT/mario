@@ -6,7 +6,7 @@ from pandas import DataFrame
 
 from mario.dataset_specification import DatasetSpecification
 from mario.metadata import Metadata
-from mario.options import CsvOptions, HyperOptions
+from mario.options import CsvOptions, HyperOptions, OutputOptions
 from mario.mapping import FieldMapping
 
 logger = logging.getLogger(__name__)
@@ -457,6 +457,33 @@ class StreamingDataExtractor(DataExtractor):
                     df['row_number'] = range(row_counter, row_counter + len(df))
                     row_counter += len(df)  # Update the counter
             frame_to_hyper(df, database=file_path, table=table_name, table_mode='a')
+
+    def stream_sql_to_parquet(self, file_path: str, **kwargs):
+        """
+        Write From SQL to parquet using streaming. No data is held in memory
+        apart from chunks of rows as they are read.
+        Optionally, data can be validated as it is read.
+        """
+        options = OutputOptions(**kwargs)
+        self.__build_query__()
+        logger.info("Executing query")
+
+        connection = self.get_connection()
+        row_counter = 0
+        for df in pd.read_sql(self._query[0], connection, chunksize=options.chunk_size):
+            df = self.mapping.df_to_logical(df)
+            if options.validate or options.minimise or options.include_row_numbers:
+                self._data = df
+                if options.validate:
+                    self.validate_data(allow_nulls=options.allow_nulls)
+                if options.minimise:
+                    self.__minimise_data__()
+                    df = self._data
+                self._data = None
+                if options.include_row_numbers:
+                    df['row_number'] = range(row_counter, row_counter + len(df))
+                    row_counter += len(df)  # Update the counter
+            df.to_parquet(path=file_path)
 
     def stream_sql_query_to_csv(self, file_path, query, connection, row_counter=0, **kwargs) -> int:
         from mario.query_builder import get_formatted_query
