@@ -3,6 +3,8 @@ import tempfile
 
 import pandas as pd
 from pandas import DataFrame
+import pyarrow as pa
+import pyarrow.parquet as pq
 
 from mario.dataset_specification import DatasetSpecification
 from mario.metadata import Metadata
@@ -468,6 +470,7 @@ class StreamingDataExtractor(DataExtractor):
         self.__build_query__()
         logger.info("Executing query")
 
+        writer = None
         connection = self.get_connection()
         row_counter = 0
         for df in pd.read_sql(self._query[0], connection, chunksize=options.chunk_size):
@@ -483,7 +486,14 @@ class StreamingDataExtractor(DataExtractor):
                 if options.include_row_numbers:
                     df['row_number'] = range(row_counter, row_counter + len(df))
                     row_counter += len(df)  # Update the counter
-            df.to_parquet(path=file_path)
+
+            table = pa.Table.from_pandas(df)
+            if writer is None:
+                writer = pq.ParquetWriter(file_path, table.schema)
+
+            writer.write_table(table)
+
+        writer.close()
 
     def stream_sql_query_to_csv(self, file_path, query, connection, row_counter=0, **kwargs) -> int:
         from mario.query_builder import get_formatted_query
