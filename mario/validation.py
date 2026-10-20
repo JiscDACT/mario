@@ -267,6 +267,8 @@ class ManifestValidator:
                      "csv codes only","excel codes only",
                      "parquet codes only"]
 
+    VALID_AGGREGATIONS = ["sum","avg","min","max","count"]
+
     def __init__(self, metadata: Metadata = None):
         self.metadata = metadata
         self.errors = []
@@ -332,6 +334,13 @@ class ManifestValidator:
         dimensions = manifest.get("dimensions", [])
         if not dimensions:
             self.errors.append("No dimensions specified")
+            return
+        duplicate_dimensions = {
+            dimension
+            for dimension in dimensions
+            if dimensions.count(dimension) > 1}
+        for dimension in duplicate_dimensions:
+            self.errors.append(f"Duplicate dimension '{dimension}' specified")
 
     def check_measures(self, manifest):
         """Checks that at least one measure has been specified."""
@@ -348,8 +357,9 @@ class ManifestValidator:
                 continue
             if "name" not in measure:
                 self.errors.append(f"Measure at index {index} is missing 'name'")
-            if "aggregation" not in measure:
-                self.errors.append(f"Measure at index {index} is missing 'aggregation'")
+            aggregation = measure.get("aggregation")
+            if aggregation not in [None, ""] and aggregation not in self.VALID_AGGREGATIONS:
+                self.errors.append(f"Measure at index {index} has unsupported aggregation '{aggregation}'")
 
     def check_constraint_definitions(self, manifest):
         """Checks that constraints contain the required properties."""
@@ -362,6 +372,8 @@ class ManifestValidator:
                 self.errors.append(f"Constraint at index {index} is missing 'item'")
             if "allowedValues" not in constraint:
                 self.errors.append(f"Constraint at index {index} is missing 'allowedValues'")
+            elif not constraint["allowedValues"]:
+                self.errors.append(f"Constraint at index {index} has no allowedValues")
 
     def check_constraint_domains(self, manifest):
         """Checks that constraint values exist within the item's valid domain."""

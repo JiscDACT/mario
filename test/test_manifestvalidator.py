@@ -1,6 +1,7 @@
 import json
 import os
 import tempfile
+import pytest
 
 from mario.metadata import Metadata, Item
 from mario.validation import ManifestValidator
@@ -99,6 +100,18 @@ def test_no_dimensions():
     assert "No dimensions specified" in errors
     os.remove(manifest_path)
 
+def test_duplicate_dimensions():
+    validator = get_validator()
+    manifest = get_valid_manifest()
+    manifest["dimensions"] = [
+        "Sex",
+        "Region",
+        "Sex"]
+    manifest_path = create_manifest_file(manifest)
+    errors, warnings = validator.validate(manifest_path)
+    assert ("Duplicate dimension 'Sex' specified" in errors)
+    os.remove(manifest_path)
+
 def test_no_measures():
     validator = get_validator()
     manifest = get_valid_manifest()
@@ -108,7 +121,7 @@ def test_no_measures():
     assert "No measures specified" in errors
     os.remove(manifest_path)
 
-def test_measure_missing_aggregation():
+def test_measure_without_aggregation():
     validator = get_validator()
     manifest = get_valid_manifest()
     manifest["measures"] = [
@@ -118,7 +131,36 @@ def test_measure_missing_aggregation():
     ]
     manifest_path = create_manifest_file(manifest)
     errors, warnings = validator.validate(manifest_path)
-    assert "Measure at index 0 is missing 'aggregation'" in errors
+    assert errors == []
+    os.remove(manifest_path)
+
+@pytest.mark.parametrize("aggregation",["sum", "avg", "min", "max", "count"])
+def test_valid_aggregations(aggregation):
+    validator = get_validator()
+    manifest = get_valid_manifest()
+    manifest["measures"] = [
+        {
+            "name": "Student Count",
+            "aggregation": aggregation
+        }
+    ]
+    manifest_path = create_manifest_file(manifest)
+    errors, warnings = validator.validate(manifest_path)
+    assert errors == []
+    os.remove(manifest_path)
+
+def test_invalid_aggregation():
+    validator = get_validator()
+    manifest = get_valid_manifest()
+    manifest["measures"] = [
+        {
+            "name": "Student Count",
+            "aggregation": "median"
+        }
+    ]
+    manifest_path = create_manifest_file(manifest)
+    errors, warnings = validator.validate(manifest_path)
+    assert ("Measure at index 0 has unsupported aggregation 'median'" in errors)
     os.remove(manifest_path)
 
 def test_constraint_missing_allowed_values():
@@ -131,10 +173,21 @@ def test_constraint_missing_allowed_values():
     ]
     manifest_path = create_manifest_file(manifest)
     errors, warnings = validator.validate(manifest_path)
-    assert (
-        "Constraint at index 0 is missing 'allowedValues'"
-        in errors
-    )
+    assert ("Constraint at index 0 is missing 'allowedValues'" in errors)
+    os.remove(manifest_path)
+
+def test_constraint_empty_allowed_values():
+    validator = get_validator()
+    manifest = get_valid_manifest()
+    manifest["constraints"] = [
+        {
+            "item": "Sex",
+            "allowedValues": []
+        }
+    ]
+    manifest_path = create_manifest_file(manifest)
+    errors, warnings = validator.validate(manifest_path)
+    assert ("Constraint at index 0 has no allowedValues" in errors)
     os.remove(manifest_path)
 
 def test_constraint_domain_validation():
@@ -151,22 +204,33 @@ def test_constraint_domain_validation():
     assert "'Other' is not in domain of 'Sex'" in errors
     os.remove(manifest_path)
 
-def test_valid_format():
+@pytest.mark.parametrize("format_name",["csv","excel","excel pivot",
+        "parquet","csv codes only","excel codes only","parquet codes only"])
+def test_valid_formats(format_name):
     validator = get_validator()
     manifest = get_valid_manifest()
-    manifest["format"] = "csv"
+    manifest["format"] = format_name
     manifest_path = create_manifest_file(manifest)
     errors, warnings = validator.validate(manifest_path)
     assert errors == []
     os.remove(manifest_path)
 
-def test_invalid_format_list():
+def test_invalid_format():
     validator = get_validator()
     manifest = get_valid_manifest()
-    manifest["format"] = ["banana"]
+    manifest["format"] = "banana"
     manifest_path = create_manifest_file(manifest)
     errors, warnings = validator.validate(manifest_path)
     assert "Unsupported format 'banana'" in errors
+    os.remove(manifest_path)
+
+def test_invalid_format_type():
+    validator = get_validator()
+    manifest = get_valid_manifest()
+    manifest["format"] = 123
+    manifest_path = create_manifest_file(manifest)
+    errors, warnings = validator.validate(manifest_path)
+    assert ("Property 'format' must be a string or list" in errors)
     os.remove(manifest_path)
 
 def test_constraint_unknown_metadata_item():
