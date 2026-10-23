@@ -142,4 +142,11 @@ from the same source, in different formats:
 
 
 # Building and releasing new versions
-TODO
+
+* Go to Releases in GitHub and select Draft a new release.
+* Under Choose a tag, select Create new tag and enter the new version number (e.g. 0.66).
+* Enter a release title (e.g. v0.66) and add any relevant release notes.
+* Ensure the release is marked as Latest release.
+* Click Publish release.
+* Once published,the GitHub Actions will automatically publish the package to PyPI.
+
