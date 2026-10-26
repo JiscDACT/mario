@@ -143,10 +143,15 @@ from the same source, in different formats:
 
 # Building and releasing new versions
 
-* Go to Releases in GitHub and select Draft a new release.
+* Update the package version in setup.py to the new version you are releasing (for example, 0.66).   
+* In the GitHub repository, navigate to Releases: 
+    * From the repository home page, select Releases from the right-hand panel, or
+    * Open the repository's Releases page directly by appending /releases to the repository URL.
+* Select Draft a new release.
 * Under Choose a tag, select Create new tag and enter the new version number (e.g. 0.66).
 * Enter a release title (e.g. v0.66) and add any relevant release notes.
 * Ensure the release is marked as Latest release.
 * Click Publish release.
 * Once published,the GitHub Actions will automatically publish the package to PyPI.
+* Wait for the GitHub Actions workflow to complete and verify that the new version is available on PyPI (https://pypi.org/).
 
