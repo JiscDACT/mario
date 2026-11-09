@@ -36,11 +36,11 @@ def get_valid_manifest():
 
     return {
         "requested_by": "Test User",
-        "prepared_by": "Test Analyst",
+        'prepared_by': "testuser@test.ac.uk",
         "datasource": "Students",
         "order_reference": 123,
         "customer_reference": "ABC",
-        "format": "csv",
+        "format": "CSV - Labelled",
         "access_until": "2027-01-01",
         "name": "Test Dataset",
         "scope": "student",
@@ -98,6 +98,20 @@ def test_no_dimensions():
     manifest_path = create_manifest_file(manifest)
     errors, warnings = validator.validate(manifest_path)
     assert "No dimensions specified" in errors
+    os.remove(manifest_path)
+
+def test_prepared_by_is_optional():
+    validator = get_validator()
+    manifest = get_valid_manifest()
+
+    del manifest["prepared_by"]
+
+    manifest_path = create_manifest_file(manifest)
+    errors, warnings = validator.validate(manifest_path)
+
+    assert "Missing required property 'prepared_by'" not in errors
+    assert errors == []
+
     os.remove(manifest_path)
 
 def test_duplicate_dimensions():

@@ -253,19 +253,18 @@ class ManifestValidator:
     """
     Validates a manifest.json against the expected manifest specification.
     """
-    REQUIRED_PROPERTIES = [ "requested_by","prepared_by","datasource","name",
+    REQUIRED_PROPERTIES = [ "requested_by","datasource","name",
         "scope","context","dimensions","measures"]
 
     EXPECTED_TYPES = {
-        "requested_by": str,"prepared_by": str,"datasource": str,
+        "requested_by": str,"datasource": str,
         "order_reference": int,"customer_reference": str,"access_until": str,
         "item_number": int,"onwardsUseCategory": int,"name": str,"scope": str,
         "context": str,"dimensions": list,"measures": list,"constraints": list,
         "transformations": list,"years": list}
 
-    VALID_FORMATS = ["csv","excel","excel pivot","parquet",
-                     "csv codes only","excel codes only",
-                     "parquet codes only"]
+    VALID_FORMATS = ["CSV - Labelled","CSV - Unlabelled","Text - Labelled","Text - Unlabelled",
+                     "Excel","Excel - Pivot", "Parquet - Labelled", "Parquet - Unlabelled"]
 
     VALID_AGGREGATIONS = ["sum","avg","min","max","count"]
 
